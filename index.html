@@ -1563,41 +1563,59 @@ function preencherFormularioComRegistro(r){
   if(r.desafios){ var q=document.getElementById('q11-resp'); if(q) q.value=r.desafios; }
 }
 function coletarDadosFormulario(finalizado){
-  var nome=campoValor('#p-nome');
-  var inst=campoValor('#p-inst');
-  var cargo=campoValor('#p-cargo');
-  var email=normalizarEmail(campoValor('#p-email') || (_currentUser && _currentUser.email));
-  var telefone=campoValor('#p-telefone');
-  var perfil=radioValor('perf');
-  var contribuicoes=checkedLabels('#f1s2 .fi:first-of-type input[type="checkbox"]');
-  var temas=checkedLabels('.tema-cb');
-  var barreiras=checkedLabels('.bar-cb');
-  var contextoTextos=textareasValues('#f1s4');
-  var expectativasTextos=textareasValues('#f1s5');
-  var presenca=!!document.querySelector('input[name="conf"]:checked');
-  var dados={
-    nome:nome,
-    inst:inst,
-    orgao:inst,
-    cargo:cargo,
-    email:email || null,
-    telefone:telefone || null,
-    perfil:perfil || null,
-    foto_base64:window._fotoDataURL || null,
-    presenca_confirmada:presenca,
-    contribuicao:(campoValor('#q10-resp') || contribuicoes.join('; ') || null),
-    desafios:(campoValor('#q11-resp') || barreiras.join('; ') || null),
-    contexto:contextoTextos.filter(Boolean).join('\n\n') || null,
-    expectativas:(expectativasTextos.filter(Boolean).join('\n\n') || campoValor('#q14-resp') || null),
-    dados_perfil:{perfil:perfil, contribuicoes:contribuicoes, temas:temas},
-    dados_instituicao:{nome:nome, instituicao:inst, cargo:cargo, email:email, telefone:telefone, presenca_confirmada:presenca, temas:temas, contribuicoes:contribuicoes},
-    dados_desafios:{principal:campoValor('#q11-resp'), barreiras:barreiras, temas:temas},
-    dados_contexto:{textos:contextoTextos},
-    dados_expectativas:{textos:expectativasTextos},
-    updated_at:new Date().toISOString()
+  var nome      = campoValor('#p-nome');
+  var inst      = campoValor('#p-inst');
+  var cargo     = campoValor('#p-cargo');
+  var email     = normalizarEmail(campoValor('#p-email') || (_currentUser && _currentUser.email));
+  var telefone  = campoValor('#p-telefone');
+  var perfil    = radioValor('perf');
+  var presenca  = !!document.querySelector('input[name="conf"]:checked');
+
+  /* Contribuições — seletor corrigido para pegar o primeiro cbg do f1s2 */
+  var contribuicoes = checkedLabels('#f1s2 .cbg:first-of-type input[type="checkbox"]');
+  var temas         = checkedLabels('.tema-cb');
+  var barreiras     = checkedLabels('.bar-cb');
+
+  /* Contexto — 6 textareas com seus títulos */
+  var labelsCtx = ['Meu papel neste ecossistema','O que estou tentando avançar','O que trava esse avanço','Por que isso persiste','O que me motiva a continuar','O que preciso desta oficina'];
+  var tasCtx    = document.querySelectorAll('#f1s4 textarea');
+  var contextoTextos = Array.from(tasCtx).map(function(t){ return (t.value||'').trim(); });
+  var contextoNamed  = {};
+  labelsCtx.forEach(function(l,i){ if(contextoTextos[i]) contextoNamed[l]=contextoTextos[i]; });
+
+  /* Expectativas — 2 textareas com seus títulos */
+  var labelsExp = ['O que faria esta oficina valer o seu tempo','Daqui a 1 ano, como você saberia que avançamos'];
+  var tasExp    = document.querySelectorAll('#f1s5 textarea');
+  var expectativasTextos = Array.from(tasExp).map(function(t){ return (t.value||'').trim(); });
+  var expectativasNamed  = {};
+  labelsExp.forEach(function(l,i){ if(expectativasTextos[i]) expectativasNamed[l]=expectativasTextos[i]; });
+
+  var dados = {
+    nome:     nome     || null,
+    inst:     inst     || null,
+    orgao:    inst     || null,
+    cargo:    cargo    || null,
+    email:    email    || null,
+    telefone: telefone || null,
+    perfil:   perfil   || null,
+    foto_base64: window._fotoDataURL || null,
+    presenca_confirmada: presenca,
+    contribuicao: (campoValor('#q10-resp') || (contribuicoes.length ? contribuicoes.join('; ') : null)),
+    desafios: (campoValor('#q11-resp') || (barreiras.length ? barreiras.join('; ') : null)),
+    contexto: contextoTextos.filter(Boolean).join('\n\n') || null,
+    expectativas: (expectativasTextos.filter(Boolean).join('\n\n') || campoValor('#q14-resp') || null),
+    dados_perfil: { perfil:perfil, contribuicoes:contribuicoes, temas:temas },
+    dados_instituicao: { nome:nome, instituicao:inst, cargo:cargo, email:email, telefone:telefone, presenca_confirmada:presenca },
+    dados_desafios: { principal:campoValor('#q11-resp'), barreiras:barreiras, temas:temas },
+    dados_contexto: contextoNamed,
+    dados_expectativas: expectativasNamed,
+    updated_at: new Date().toISOString()
   };
-  if(finalizado) dados.formpreenchido=true;
-  Object.keys(dados).forEach(function(k){ if(dados[k]===undefined) delete dados[k]; });
+  if(finalizado) dados.formpreenchido = true;
+  /* Remover campos undefined/null vazios para não poluir o banco */
+  Object.keys(dados).forEach(function(k){
+    if(dados[k]===undefined || dados[k]===null || dados[k]==='') delete dados[k];
+  });
   return dados;
 }
 async function hashSenha(senha){
