@@ -3524,6 +3524,7 @@ function showAuth(mode) {
   document.getElementById('splash-screen').style.display = 'none';
   document.getElementById('auth-card-screen').style.display = 'flex';
   document.getElementById('participant-area').style.display = 'none';
+  document.getElementById('auth-submit-btn').disabled = false;
   switchAuthMode(mode);
   setTimeout(function() {
     var first = mode === 'cadastro'
@@ -3547,6 +3548,8 @@ function switchAuthMode(mode) {
     ? 'Já tem cadastro? <button onclick="switchAuthMode(\'login\')">Entrar</button>'
     : 'Ainda não tem cadastro? <button onclick="switchAuthMode(\'cadastro\')">Inscrever-se</button>';
   document.getElementById('auth-error').classList.remove('show');
+  /* Sempre reabilitar o botão ao trocar de modo */
+  document.getElementById('auth-submit-btn').disabled = false;
   /* Clear password fields */
   document.getElementById('auth-senha').value = '';
   if (document.getElementById('auth-confirma')) document.getElementById('auth-confirma').value = '';
