@@ -1777,21 +1777,32 @@ async function stepNav1(d){
   goStep1(nx);
 }
 async function submitForm1(){
-  for(var _v=0; _v<6; _v++){ if(!validarEtapa1(_v,true)){ goStep1(_v); return; } }
-  var nome=document.getElementById('p-nome').value;
-  var inst=document.getElementById('p-inst').value;
-  var email=(document.getElementById('p-email')||{value:''}).value.trim();
-  if(!nome || !inst || !email){ alert('Preencha nome, instituição e e-mail antes de finalizar.'); goStep1(0); return; }
+  var nome=(document.getElementById('p-nome')||{value:''}).value.trim();
+  var inst=(document.getElementById('p-inst')||{value:''}).value.trim();
+  var emailEl=document.getElementById('p-email');
+  var email=emailEl ? emailEl.value.trim() : '';
+  if(!email && _currentUser) email = _currentUser.email || '';
+
   addWordsFromText((document.getElementById('q10-resp')||{value:''}).value+(document.getElementById('q11-resp')||{value:''}).value+(document.getElementById('q14-resp')||{value:''}).value);
-  if(nome)window._lastNome=nome;
-  if(inst)window._lastInst=inst;
-  var foto2=window._fotoDataURL||null;
-  var perfilEl=document.querySelector('input[name="perf"]:checked');
-  var perfil2=perfilEl?(perfilEl.parentElement.textContent||'').trim().replace(/\s+/g,' '):'';
-  var cargo2=(document.getElementById('p-cargo')||{value:''}).value.trim();
-  if(nome&&inst&&typeof salvarInscrito==='function') salvarInscrito(nome,inst,foto2,perfil2,cargo2);
+  if(nome) window._lastNome=nome;
+  if(inst) window._lastInst=inst;
+
+  /* 1. Salvar todos os dados do formulário na tabela inscritos */
   await salvarFormularioSupabase(true);
-  if(_currentUser){ _currentUser.formpreenchido=true; saveSession(_currentUser); }
+
+  /* 2. Marcar inscrito=true na tabela usuarios */
+  if(email) await supaMarcarInscrito(email);
+
+  /* 3. Atualizar sessão */
+  if(_currentUser){ _currentUser.inscrito=true; saveSession(_currentUser); }
+
+  /* 4. Array local para exibição imediata no mural */
+  var foto=window._fotoDataURL||null;
+  var perfilEl=document.querySelector('input[name="perf"]:checked');
+  var perfil=perfilEl?(perfilEl.parentElement.textContent||'').trim().replace(/\s+/g,' '):'';
+  var cargo=(document.getElementById('p-cargo')||{value:''}).value.trim();
+  if(nome && inst && typeof salvarInscrito==='function') salvarInscrito(nome,inst,foto,perfil,cargo);
+
   if(typeof salvarDadosDashboard==='function') salvarDadosDashboard();
   if(typeof spawnConfetti==='function') spawnConfetti();
   document.getElementById('f1-area').style.display='none';
@@ -3394,12 +3405,8 @@ var _authMode = 'cadastro';  /* 'cadastro' | 'login' */
 var _currentUser = null;     /* { nome, inst, email, senha, inscrito, presente } */
 
 /* ── Storage helpers ── */
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem('cpi-users') || '{}'); } catch(e) { return {}; }
-}
-function saveUsers(u) {
-  try { localStorage.setItem('cpi-users', JSON.stringify(u)); } catch(e) {}
-}
+function getUsers() { return {}; }
+function saveUsers(u) {}
 function getSession() {
   try { return JSON.parse(sessionStorage.getItem('cpi-session') || 'null'); } catch(e) { return null; }
 }
@@ -3422,6 +3429,7 @@ function showAuth(mode) {
   document.getElementById('splash-screen').style.display = 'none';
   document.getElementById('auth-card-screen').style.display = 'flex';
   document.getElementById('participant-area').style.display = 'none';
+  document.getElementById('auth-submit-btn').disabled = false;
   switchAuthMode(mode);
   setTimeout(function() {
     var first = mode === 'cadastro'
@@ -3445,6 +3453,7 @@ function switchAuthMode(mode) {
     ? 'Já tem cadastro? <button onclick="switchAuthMode(\'login\')">Entrar</button>'
     : 'Ainda não tem cadastro? <button onclick="switchAuthMode(\'cadastro\')">Inscrever-se</button>';
   document.getElementById('auth-error').classList.remove('show');
+  document.getElementById('auth-submit-btn').disabled = false;
   /* Clear password fields */
   document.getElementById('auth-senha').value = '';
   if (document.getElementById('auth-confirma')) document.getElementById('auth-confirma').value = '';
@@ -3487,68 +3496,84 @@ async function submitAuth() {
   btn.disabled = true;
   btn.textContent = 'Aguarde...';
 
-  var email = (document.getElementById('auth-email').value || '').trim().toLowerCase();
-  var senha = document.getElementById('auth-senha').value || '';
+  function resetBtn() {
+    btn.disabled = false;
+    btn.textContent = _authMode === 'cadastro' ? 'Criar cadastro e continuar' : 'Entrar';
+  }
 
-  if (!email || !senha) { showAuthError('Preencha e-mail e senha.'); return; }
-  var sb=getSupabase();
-  var users = getUsers();
+  try {
+    var email = (document.getElementById('auth-email').value || '').trim().toLowerCase();
+    var senha = document.getElementById('auth-senha').value || '';
+    if (!email || !senha) { showAuthError('Preencha e-mail e senha.'); resetBtn(); return; }
 
-  if (_authMode === 'cadastro') {
-    var nome     = (document.getElementById('auth-nome').value || '').trim();
-    var inst     = (document.getElementById('auth-inst').value || '').trim();
-    var confirma = document.getElementById('auth-confirma').value || '';
-    if (!nome || !inst) { showAuthError('Informe nome e instituição.'); return; }
-    if (senha.length < 6) { showAuthError('A senha deve ter pelo menos 6 caracteres.'); return; }
-    if (senha !== confirma) { showAuthError('As senhas não conferem.'); return; }
+    if (_authMode === 'cadastro') {
+      var nome     = (document.getElementById('auth-nome').value || '').trim();
+      var inst     = (document.getElementById('auth-inst').value || '').trim();
+      var confirma = document.getElementById('auth-confirma').value || '';
+      if (!nome) { showAuthError('Informe seu nome completo.'); resetBtn(); return; }
+      if (!inst) { showAuthError('Informe sua instituição.'); resetBtn(); return; }
+      if (senha.length < 6) { showAuthError('A senha deve ter pelo menos 6 caracteres.'); resetBtn(); return; }
+      if (senha !== confirma) { showAuthError('As senhas não conferem.'); resetBtn(); return; }
 
-    var senhaHash=await hashSenha(senha);
-    if(sb){
-      var chk=await sb.from('inscritos').select('*').eq('email',email).maybeSingle();
-      if(chk.data && chk.data.senha_hash){ showAuthError('Esse e-mail já está cadastrado. Faça login.'); return; }
-    } else if (users[email]) { showAuthError('Esse e-mail já está cadastrado. Faça login.'); return; }
+      var existente = await supaGetUsuario(email);
+      if (existente) { showAuthError('Esse e-mail já está cadastrado. Faça login.'); resetBtn(); return; }
 
-    var newUser = { nome:nome, inst:inst, orgao:inst, email:email, senha_hash:senhaHash, inscrito:true, presente:false, ts:Date.now(), formpreenchido:false };
-    if(sb){
-      var saved=await salvarRegistroSupabase({nome:nome, inst:inst, orgao:inst, email:email, senha_hash:senhaHash, presenca_confirmada:false, updated_at:new Date().toISOString()});
-      if(saved) newUser=Object.assign(newUser,saved,{foto:saved.foto_base64||saved.foto_url||null, presente:!!saved.presenca_confirmada});
-    }
-    users[email] = newUser; saveUsers(users); saveSession(newUser); _currentUser = newUser;
+      var res = await supaCriarUsuario(email, senha, nome, inst);
+      if (res.error) { showAuthError('Erro ao cadastrar: ' + res.error); resetBtn(); return; }
 
-    setTimeout(function() {
-      var nomeEl = document.getElementById('p-nome');
-      var instEl = document.getElementById('p-inst');
-      var emailEl = document.getElementById('p-email');
-      if (nomeEl) nomeEl.value = nome;
-      if (instEl) instEl.value = inst;
-      if (emailEl) emailEl.value = email;
-    }, 100);
+      var newUser = { nome:nome, inst:inst, email:email, inscrito:false, presente:false };
+      saveSession(newUser);
+      _currentUser = newUser;
 
-    document.getElementById('auth-layer').classList.add('hidden');
-    setTimeout(function() { var t1btn = document.querySelector('[data-tab="t1"]'); if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn); }, 100);
-  } else {
-    var user=null;
-    var senhaHash=await hashSenha(senha);
-    if(sb){
-      var res=await sb.from('inscritos').select('*').eq('email',email).maybeSingle();
-      if(res.error){ showAuthError('Erro ao consultar o Supabase: '+res.error.message); return; }
-      if(res.data) user=Object.assign({},res.data,{foto:res.data.foto_base64||res.data.foto_url||null,presente:!!res.data.presenca_confirmada});
-    }
-    if(!user) user=users[email];
-    if (!user) { showAuthError('E-mail não encontrado. Faça seu cadastro.'); return; }
-    var okSenha = (user.senha_hash && user.senha_hash===senhaHash) || (user.senha && user.senha===senha);
-    if (!okSenha) { showAuthError('Senha incorreta.'); return; }
-    _currentUser=user; saveSession(user); users[email]=user; saveUsers(users);
-    preencherFormularioComRegistro(user);
-    if (!(user.formpreenchido||user.formPreenchido) && !user.expectativas && !user.contexto) {
+      setTimeout(function() {
+        var nomeEl  = document.getElementById('p-nome');
+        var instEl  = document.getElementById('p-inst');
+        var emailEl = document.getElementById('p-email');
+        if (nomeEl)  nomeEl.value  = nome;
+        if (instEl)  instEl.value  = inst;
+        if (emailEl) emailEl.value = email;
+      }, 100);
+
       document.getElementById('auth-layer').classList.add('hidden');
-      setTimeout(function() { var t1btn = document.querySelector('[data-tab="t1"]'); if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn); }, 100);
+      setTimeout(function() {
+        var t1btn = document.querySelector('[data-tab="t1"]');
+        if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
+      }, 100);
+
     } else {
-      showParticipantArea(user);
+      /* LOGIN — tabela usuarios */
+      var user = await supaGetUsuario(email);
+      if (!user) { showAuthError('E-mail não encontrado. Faça seu cadastro.'); resetBtn(); return; }
+      if (user.senha !== senha) { showAuthError('Senha incorreta.'); resetBtn(); return; }
+
+      _currentUser = user;
+      saveSession(user);
+
+      if (!user.inscrito) {
+        setTimeout(function() {
+          var nomeEl  = document.getElementById('p-nome');
+          var instEl  = document.getElementById('p-inst');
+          var emailEl = document.getElementById('p-email');
+          if (nomeEl)  nomeEl.value  = user.nome;
+          if (instEl)  instEl.value  = user.inst;
+          if (emailEl) emailEl.value = email;
+          preencherFormularioComRegistro(user);
+        }, 100);
+        document.getElementById('auth-layer').classList.add('hidden');
+        setTimeout(function() {
+          var t1btn = document.querySelector('[data-tab="t1"]');
+          if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
+        }, 100);
+      } else {
+        showParticipantArea(user);
+      }
     }
+  } catch(e) {
+    console.warn('submitAuth error:', e);
+    showAuthError('Erro inesperado. Tente novamente.');
+    resetBtn();
   }
 }
-
 function showAuthError(msg) {
   var el = document.getElementById('auth-error');
   el.textContent = msg;
@@ -3658,31 +3683,41 @@ function gerarComprovanteParticipante() {
   if (document.getElementById('p-inst')) document.getElementById('p-inst').value = saved_inst;
 }
 
-/* ── On load: check session ── */
+/* ── On load: check session (Supabase usuarios) ── */
 window.addEventListener('load', async function() {
   var session = getSession();
   if (session && session.email) {
-    var users = getUsers();
-    var user  = users[session.email] || session;
-    var sb = getSupabase();
-    if (sb) {
-      try {
-        var res = await sb.from('inscritos').select('*').eq('email', session.email).maybeSingle();
-        if (res.data) user = Object.assign({}, user, res.data, {foto:res.data.foto_base64||res.data.foto_url||user.foto, presente:!!res.data.presenca_confirmada});
-      } catch(e) {}
-    }
+    var user = await supaGetUsuario(session.email);
+    if (!user) { showSplash(); return; }
     _currentUser = user;
-    preencherFormularioComRegistro(user);
-    if ((user.formpreenchido||user.formPreenchido) || user.expectativas || user.contexto) showParticipantArea(user);
-    else { document.getElementById('auth-layer').classList.add('hidden'); var t1btn=document.querySelector('[data-tab="t1"]'); if(t1btn&&typeof switchTab==='function') switchTab('t1',t1btn); }
+    saveSession(user);
+    if (user.inscrito) {
+      showParticipantArea(user);
+    } else {
+      preencherFormularioComRegistro(user);
+      document.getElementById('auth-layer').classList.add('hidden');
+      var t1btn = document.querySelector('[data-tab="t1"]');
+      if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
+    }
   } else {
     showSplash();
   }
   setTimeout(function(){
     var area=document.getElementById('f1-area');
     if(area){
-      area.addEventListener('change', function(){ salvarFormularioSupabase(false); });
-      area.addEventListener('input', function(){ clearTimeout(window._autosaveT); window._autosaveT=setTimeout(function(){salvarFormularioSupabase(false);},900); });
+      area.addEventListener('change', function(){
+        var n=(document.getElementById('p-nome')||{value:''}).value.trim();
+        var i=(document.getElementById('p-inst')||{value:''}).value.trim();
+        if(n && i) salvarFormularioSupabase(false);
+      });
+      area.addEventListener('input', function(){
+        clearTimeout(window._autosaveT);
+        window._autosaveT=setTimeout(function(){
+          var n=(document.getElementById('p-nome')||{value:''}).value.trim();
+          var i=(document.getElementById('p-inst')||{value:''}).value.trim();
+          if(n && i) salvarFormularioSupabase(false);
+        },1500);
+      });
     }
   },500);
 });
