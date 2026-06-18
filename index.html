@@ -1503,7 +1503,90 @@ html,body{height:100%;font-family:var(--font);background:#EEF2F9;color:var(--col
     <button onclick="document.getElementById('lock-overlay').style.display='none'" style="width:100%;padding:8px;background:none;color:#8A9AB5;border:none;font-size:12px;cursor:pointer">Cancelar</button>
   </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+
+/* ══════════════════════════════════════════════════════
+   SUPABASE INTEGRATION
+══════════════════════════════════════════════════════ */
+const SUPA_URL = 'https://zulyydhfjuhcjmnucvvy.supabase.co';
+const SUPA_KEY = 'sb_publishable_Evs9IhTXHuhU-iUFGnoYMw_OPoFDzmD';
+let _supa = null;
+
+function getSupabase() {
+  if (!_supa && window.supabase) {
+    _supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+  }
+  return _supa;
+}
+
+/* Save inscrito to Supabase */
+async function salvarInscritoSupabase(nome, inst, cargo, perfil, foto) {
+  const sb = getSupabase();
+  if (!sb) return;
+  try {
+    const { error } = await sb.from('inscritos').insert({
+      nome: nome,
+      inst: inst,
+      cargo: cargo || '',
+      perfil: perfil || '',
+      foto_base64: foto || null
+    });
+    if (error) console.warn('Supabase insert error:', error.message);
+    else console.log('✅ Inscrito salvo no Supabase');
+  } catch(e) { console.warn('Supabase error:', e); }
+}
+
+/* Load inscritos from Supabase */
+async function carregarInscritosSupabase() {
+  const sb = getSupabase();
+  if (!sb) return;
+  try {
+    const { data, error } = await sb.from('inscritos')
+      .select('nome, inst, cargo, perfil, foto_base64')
+      .order('created_at', { ascending: true });
+    if (error) { console.warn('Supabase load error:', error.message); return; }
+    if (!data || !data.length) return;
+    data.forEach(function(p) {
+      var existe = _inscritos.some(function(x) { return x.nome === p.nome && x.inst === p.inst; });
+      if (!existe) {
+        _inscritos.push({
+          nome: p.nome,
+          inst: p.inst,
+          cargo: p.cargo || '',
+          perfil: p.perfil || '',
+          foto: p.foto_base64 || null
+        });
+      }
+    });
+    if (typeof renderRanking === 'function') renderRanking();
+    console.log('✅ Inscritos carregados do Supabase:', data.length);
+  } catch(e) { console.warn('Supabase load error:', e); }
+}
+
+/* Realtime subscription */
+function assinarRealtimeInscritos() {
+  const sb = getSupabase();
+  if (!sb) return;
+  sb.channel('inscritos-changes')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inscritos' },
+      function(payload) {
+        var p = payload.new;
+        var existe = _inscritos.some(function(x) { return x.nome === p.nome; });
+        if (!existe) {
+          _inscritos.push({
+            nome: p.nome, inst: p.inst, cargo: p.cargo || '',
+            perfil: p.perfil || '', foto: p.foto_base64 || null, novo: true
+          });
+          if (typeof renderRanking === 'function') renderRanking();
+        }
+      }
+    )
+    .subscribe();
+}
+
+</script>
 <script>
 
 /* ─── ESTADO ─── */
@@ -2625,6 +2708,8 @@ function salvarInscrito(nome,inst,foto,perfil,cargo){
   if(!nome) return;
   var jaExiste=_inscritos.some(function(p){return p.nome===nome&&p.inst===inst;});
   if(!jaExiste) _inscritos.push({nome:nome,inst:inst,foto:foto||null,perfil:perfil||'',cargo:cargo||'',novo:true});
+  /* Save to Supabase */
+  if(typeof salvarInscritoSupabase==='function') salvarInscritoSupabase(nome,inst,cargo||'',perfil||'',foto||null);
   if(window.storage){
     try{window.storage.set('cpi2026-inscritos',JSON.stringify(_inscritos));}catch(e){}
   }
@@ -2829,6 +2914,9 @@ assinar = function() {
 window.addEventListener('resize', function(){ drawWordCloud && drawWordCloud(); });
 window.addEventListener('DOMContentLoaded', function() {
   iniciarLockSystem();
+  /* Load participants from Supabase */
+  if(typeof carregarInscritosSupabase==='function') carregarInscritosSupabase();
+  if(typeof assinarRealtimeInscritos==='function') assinarRealtimeInscritos();
   carregarEstado().then(function(ok) {
     if (ok) {
       renderFac && renderFac();
