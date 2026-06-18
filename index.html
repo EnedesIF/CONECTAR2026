@@ -1521,6 +1521,79 @@ function getSupabase() {
   return _supa;
 }
 
+
+/* ─────────────────────────────────────────────
+   SUPABASE AUTH COMPAT — usa a tabela public.inscritos
+   Corrige erro: supaGetUsuario is not defined
+───────────────────────────────────────────── */
+async function supaGetUsuario(email){
+  email = normalizarEmail(email);
+  if(!email) return null;
+  const sb = getSupabase();
+  if(!sb) return null;
+  try{
+    const {data,error} = await sb
+      .from('inscritos')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    if(error){ console.warn('supaGetUsuario error:', error.message); return null; }
+    if(!data) return null;
+    return Object.assign({}, data, {
+      email: email,
+      nome: data.nome || '',
+      inst: data.inst || data.orgao || '',
+      orgao: data.orgao || data.inst || '',
+      foto: data.foto_base64 || data.foto_url || null,
+      presente: !!data.presenca_confirmada,
+      inscrito: !!(data.formpreenchido || data.formPreenchido || data.expectativas || data.contexto),
+      senha: data.senha_hash || data.senha || ''
+    });
+  }catch(e){ console.warn('supaGetUsuario exception:', e); return null; }
+}
+
+async function supaCriarUsuario(email, senha, nome, inst){
+  email = normalizarEmail(email);
+  const sb = getSupabase();
+  if(!sb) return {error:'Supabase não carregou.'};
+  try{
+    const payload = {
+      email: email,
+      nome: nome || '',
+      inst: inst || '',
+      orgao: inst || '',
+      senha_hash: senha || '',
+      presenca_confirmada: false,
+      formpreenchido: false,
+      updated_at: new Date().toISOString()
+    };
+    const {data,error} = await sb
+      .from('inscritos')
+      .upsert(payload,{onConflict:'email'})
+      .select('*')
+      .single();
+    if(error){ console.warn('supaCriarUsuario error:', error.message); return {error:error.message}; }
+    return {data:data};
+  }catch(e){ console.warn('supaCriarUsuario exception:', e); return {error:String(e && e.message ? e.message : e)}; }
+}
+
+async function supaMarcarInscrito(email){
+  email = normalizarEmail(email || (_currentUser && _currentUser.email));
+  if(!email) return null;
+  const sb = getSupabase();
+  if(!sb) return null;
+  try{
+    const {data,error} = await sb
+      .from('inscritos')
+      .update({formpreenchido:true, ultimo_acesso:new Date().toISOString(), updated_at:new Date().toISOString()})
+      .eq('email', email)
+      .select('*')
+      .maybeSingle();
+    if(error){ console.warn('supaMarcarInscrito error:', error.message); return null; }
+    return data;
+  }catch(e){ console.warn('supaMarcarInscrito exception:', e); return null; }
+}
+
 /* Helpers + Supabase persistence */
 function normalizarEmail(v){ return (v || '').trim().toLowerCase(); }
 function campoValor(sel){ var el=document.querySelector(sel); return el ? (el.value || '').trim() : ''; }
