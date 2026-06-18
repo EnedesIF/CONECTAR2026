@@ -716,7 +716,7 @@ html,body{height:100%;font-family:var(--font);background:#EEF2F9;color:var(--col
     <div style="width:52px;height:52px;border-radius:50%;background:rgba(15,110,86,.12);display:flex;align-items:center;justify-content:center"><i class="ti ti-check" style="font-size:26px;color:#0F6E56"></i></div>
     <h3 style="margin:0">Inscrição confirmada!</h3>
     <p style="margin:0;font-size:13px;color:var(--color-text-secondary);line-height:1.6">Obrigado. Usaremos o que você compartilhou para preparar uma oficina mais direta e relevante.<br>Até <strong>02 de julho</strong> no IFB Campus Brasília.</p>
-    <button onclick="var b=document.querySelector('[data-tab=\'tr\']');if(b&&typeof switchTab===\'function\')switchTab(\'tr\',b);" style="display:flex;align-items:center;gap:8px;background:#2AF598;color:#1A2E4A;border:none;border-radius:10px;padding:12px 22px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;transition:background .15s"><i class="ti ti-users" style="font-size:16px"></i>Ver participantes</button>
+    <button onclick="var b=document.querySelector('[data-tab=\'tr\']');if(b&&typeof switchTab==='function')switchTab('tr',b);" style="display:flex;align-items:center;gap:8px;background:#2AF598;color:#1A2E4A;border:none;border-radius:10px;padding:12px 22px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;transition:background .15s"><i class="ti ti-users" style="font-size:16px"></i>Ver participantes</button>
     <button onclick="gerarComprovante()" style="display:flex;align-items:center;gap:8px;background:#0C447C;color:#fff;border:none;border-radius:10px;padding:12px 22px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;margin-top:6px;transition:background .15s" onmouseover="this.style.background='#185FA5'" onmouseout="this.style.background='#0C447C'">
       <i class="ti ti-file-download" style="font-size:16px"></i>Baixar comprovante de inscrição
     </button>
@@ -1589,9 +1589,9 @@ function coletarDadosFormulario(finalizado){
     desafios:(campoValor('#q11-resp') || barreiras.join('; ') || null),
     contexto:contextoTextos.filter(Boolean).join('\n\n') || null,
     expectativas:(expectativasTextos.filter(Boolean).join('\n\n') || campoValor('#q14-resp') || null),
-    dados_perfil:{perfil:perfil},
-    dados_instituicao:{nome:nome, instituicao:inst, cargo:cargo, email:email, telefone:telefone, presenca_confirmada:presenca},
-    dados_desafios:{principal:campoValor('#q11-resp'), barreiras:barreiras},
+    dados_perfil:{perfil:perfil, contribuicoes:contribuicoes, temas:temas},
+    dados_instituicao:{nome:nome, instituicao:inst, cargo:cargo, email:email, telefone:telefone, presenca_confirmada:presenca, temas:temas, contribuicoes:contribuicoes},
+    dados_desafios:{principal:campoValor('#q11-resp'), barreiras:barreiras, temas:temas},
     dados_contexto:{textos:contextoTextos},
     dados_expectativas:{textos:expectativasTextos},
     updated_at:new Date().toISOString()
@@ -1645,6 +1645,25 @@ async function salvarInscritoSupabase(nome, inst, cargo, perfil, foto) {
     updated_at:new Date().toISOString()
   });
 }
+function aplicarRegistroAoDashboard(p){
+  if(!p) return;
+  var addMap=function(map,key){ if(key && String(key).trim()) map[String(key).trim()]=(map[String(key).trim()]||0)+1; };
+  if(p.perfil) addMap(_perfMap,p.perfil);
+  var dp=p.dados_perfil||{};
+  var di=p.dados_instituicao||{};
+  var dd=p.dados_desafios||{};
+  var temas=[];
+  [dp.temas,di.temas,dd.temas].forEach(function(arr){ if(Array.isArray(arr)) temas=temas.concat(arr); });
+  temas.forEach(function(t){ addMap(_temaMap,t); });
+  var barreiras=[];
+  [dd.barreiras].forEach(function(arr){ if(Array.isArray(arr)) barreiras=barreiras.concat(arr); });
+  barreiras.forEach(function(b){ addMap(_barMap,b); });
+  [p.contribuicao,p.desafios,p.contexto,p.expectativas].forEach(function(txt){ extrairPalavras(txt||'').forEach(function(w){ _wordMap[w]=(_wordMap[w]||0)+1; }); });
+}
+function recomputarDashboardDosInscritos(registros){
+  _wordMap={}; _temaMap={}; _barMap={}; _perfMap={};
+  (registros||[]).forEach(aplicarRegistroAoDashboard);
+}
 /* Load inscritos from Supabase */
 async function carregarInscritosSupabase() {
   const sb = getSupabase();
@@ -1654,19 +1673,18 @@ async function carregarInscritosSupabase() {
       .select('*')
       .order('created_at', { ascending: true });
     if (error) { console.warn('Supabase load error:', error.message); return; }
-    if (!data || !data.length) return;
-    data.forEach(function(p) {
-      var existe = _inscritos.some(function(x) { return (x.email&&p.email&&x.email===p.email) || (x.nome === p.nome && x.inst === p.inst); });
-      if (!existe) {
-        _inscritos.push({
-          id:p.id, email:p.email||'', nome: p.nome, inst: p.inst || p.orgao || '',
-          cargo: p.cargo || '', perfil: p.perfil || '', foto: p.foto_base64 || p.foto_url || null,
-          presente: !!p.presenca_confirmada, novo:false
-        });
-      }
+    if (!data || !data.length) { _inscritos=[]; recomputarDashboardDosInscritos([]); if (typeof renderRanking === 'function') renderRanking(); if (typeof renderDashboard === 'function') renderDashboard(); return; }
+    _inscritos = data.filter(function(p){return !!p.nome;}).map(function(p) {
+      return {
+        id:p.id, email:p.email||'', nome: p.nome, inst: p.inst || p.orgao || '',
+        cargo: p.cargo || '', perfil: p.perfil || '', foto: p.foto_base64 || p.foto_url || null,
+        presente: !!p.presenca_confirmada, novo:false
+      };
     });
+    recomputarDashboardDosInscritos(data);
     if (typeof renderRanking === 'function') renderRanking();
-    console.log('✅ Inscritos carregados do Supabase:', data.length);
+    if (typeof renderDashboard === 'function') renderDashboard();
+    console.log('✅ Inscritos reais carregados do Supabase:', data.length);
   } catch(e) { console.warn('Supabase load error:', e); }
 }
 /* Realtime subscription */
@@ -1677,11 +1695,7 @@ function assinarRealtimeInscritos() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'inscritos' },
       function(payload) {
         var p = payload.new || payload.old || {};
-        if(!p.nome) return;
-        var idx = _inscritos.findIndex(function(x){ return (x.email&&p.email&&x.email===p.email) || x.nome===p.nome; });
-        var item={id:p.id,email:p.email||'',nome:p.nome,inst:p.inst||p.orgao||'',cargo:p.cargo||'',perfil:p.perfil||'',foto:p.foto_base64||p.foto_url||null,presente:!!p.presenca_confirmada,novo:true};
-        if(idx>=0) _inscritos[idx]=Object.assign(_inscritos[idx],item); else _inscritos.push(item);
-        if (typeof renderRanking === 'function') renderRanking();
+        carregarInscritosSupabase();
       }
     )
     .subscribe();
@@ -1705,16 +1719,8 @@ var wcWords=[
   {w:'financiamento',n:7},{w:'laboratório',n:6},{w:'sandbox',n:5},{w:'design',n:5},
   {w:'conhecimento',n:5},{w:'redes',n:5},{w:'governança',n:4},{w:'inteligência artificial',n:7}
 ];
-var demoDores=[
-  {txt:'Baixa articulação institucional',n:21},{txt:'Falta de continuidade',n:18},
-  {txt:'Barreiras regulatórias',n:15},{txt:'Dificuldade de financiamento',n:12},
-  {txt:'Cultura resistente',n:10},{txt:'Falta de infraestrutura',n:7}
-];
-var demoPerfis=[
-  {txt:'Governo / gestão pública',n:12,c:'#185FA5'},{txt:'Iniciativa privada',n:8,c:'#0F6E56'},
-  {txt:'Academia e pesquisa',n:6,c:'#534AB7'},{txt:'Financiamento/fomento',n:5,c:'#BA7517'},
-  {txt:'Hubs e redes',n:4,c:'#993C1D'}
-];
+var demoDores=[];
+var demoPerfis=[];
 
 /* ─── NAVEGAÇÃO ─── */
 function switchTab(id,btn){
@@ -1732,96 +1738,60 @@ function goStep1(n){
   var el=document.getElementById('f1s'+n);if(el)el.classList.add('active');
   s1cur=n;updateS1Nav();updateStepper('s1-stepper',n,6);
 }
-function mostrarErro(msg, el) {
-  if(el){ el.style.borderColor='#993C1D'; el.focus(); setTimeout(function(){ el.style.borderColor=''; },2000); }
-  alert(msg);
-  return false;
+function marcarInvalido(el){
+  if(!el) return;
+  el.style.borderColor='#E63329';
+  el.style.boxShadow='0 0 0 3px rgba(230,51,41,.10)';
+  setTimeout(function(){el.style.borderColor='';el.style.boxShadow='';},1800);
 }
-function validarEtapa(n){
+function grupoMarcado(sel){ return document.querySelectorAll(sel+':checked').length>0; }
+function inputsPreenchidos(sel){
+  var ok=true;
+  document.querySelectorAll(sel).forEach(function(el){
+    if(!((el.value||'').trim())){ ok=false; marcarInvalido(el); }
+  });
+  return ok;
+}
+function validarEtapa1(n, mostrar){
+  var ok=true, msg='';
   if(n===0){
-    var nome  = document.getElementById('p-nome');
-    var inst  = document.getElementById('p-inst');
-    var cargo = document.getElementById('p-cargo');
-    var email = document.getElementById('p-email');
-    var tel   = document.getElementById('p-telefone');
-    var conf  = document.querySelector('input[name="conf"]:checked');
-    if(!nome  ||!nome.value.trim())  return mostrarErro('Informe seu nome completo.', nome);
-    if(!inst  ||!inst.value.trim())  return mostrarErro('Informe sua instituição / organização.', inst);
-    if(!cargo ||!cargo.value.trim()) return mostrarErro('Informe seu cargo / função.', cargo);
-    if(!email ||!email.value.trim()) return mostrarErro('Informe seu e-mail institucional.', email);
-    if(!tel   ||!tel.value.trim())   return mostrarErro('Informe seu telefone de contato.', tel);
-    if(!conf) return mostrarErro('Confirme sua presença na oficina.');
+    ok = inputsPreenchidos('#p-nome,#p-inst,#p-cargo,#p-email,#p-telefone') && ok;
+    if(!window._fotoDataURL){ ok=false; var up=document.querySelector('.upl'); if(up) marcarInvalido(up); }
+    if(!grupoMarcado('input[name="conf"]')) ok=false;
+    msg='Preencha todos os campos de identificação, inclua a foto e confirme presença.';
   }
-  if(n===1){
-    var perf = document.querySelector('input[name="perf"]:checked');
-    if(!perf) return mostrarErro('Selecione o perfil da sua instituição.');
-  }
-  if(n===2){
-    var cbs = document.querySelectorAll('#f1s2 .cbg:first-of-type input[type="checkbox"]');
-    var temContrib = Array.from(cbs).some(function(cb){ return cb.checked; });
-    if(!temContrib) return mostrarErro('Marque pelo menos uma forma de contribuição da sua instituição.');
-    var oferta = document.getElementById('q10-resp');
-    if(!oferta||!oferta.value.trim()) return mostrarErro('Descreva o que sua instituição pode oferecer ao ecossistema.', oferta);
-  }
-  if(n===3){
-    var q11  = document.getElementById('q11-resp');
-    var barr = document.querySelector('.bar-cb:checked');
-    if(!q11||!q11.value.trim()) return mostrarErro('Descreva o principal obstáculo que você enfrenta.', q11);
-    if(!barr) return mostrarErro('Selecione pelo menos uma barreira crítica.');
-  }
-  if(n===4){
-    var labels4=['Meu papel neste ecossistema','O que estou tentando avançar','O que trava esse avanço','Por que isso persiste','O que me motiva a continuar','O que preciso desta oficina'];
-    var tas4 = document.querySelectorAll('#f1s4 textarea');
-    for(var i=0;i<tas4.length;i++){
-      if(!tas4[i].value.trim()) return mostrarErro('Preencha o campo "'+( labels4[i]||'Campo '+(i+1))+'".', tas4[i]);
-    }
-  }
-  if(n===5){
-    var labels5=['O que faria esta oficina valer o seu tempo','Daqui a 1 ano, como você saberia que avançamos'];
-    var tas5 = document.querySelectorAll('#f1s5 textarea');
-    for(var i=0;i<tas5.length;i++){
-      if(!tas5[i].value.trim()) return mostrarErro('Preencha o campo "'+( labels5[i]||'Campo '+(i+1))+'".', tas5[i]);
-    }
-  }
-  return true;
+  if(n===1){ ok=grupoMarcado('input[name="perf"]'); msg='Selecione o perfil institucional.'; }
+  if(n===2){ ok=grupoMarcado('#f1s2 input[type="checkbox"]') && grupoMarcado('.tema-cb') && inputsPreenchidos('#q10-resp'); msg='Marque as contribuições, os temas e preencha a resposta aberta.'; }
+  if(n===3){ ok=grupoMarcado('.bar-cb') && inputsPreenchidos('#q11-resp'); msg='Marque ao menos uma barreira e descreva o desafio principal.'; }
+  if(n===4){ ok=inputsPreenchidos('#f1s4 textarea'); msg='Preencha todos os campos de contexto.'; }
+  if(n===5){ ok=inputsPreenchidos('#f1s5 textarea'); msg='Preencha todos os campos de expectativas.'; }
+  if(!ok && mostrar) alert(msg || 'Preencha todos os campos obrigatórios.');
+  return ok;
 }
 async function stepNav1(d){
   var nx=s1cur+d;
   if(nx<0)return;
-  if(d>0 && !validarEtapa(s1cur)) return;
-  var _n=(document.getElementById('p-nome')||{value:''}).value.trim();
-  var _i=(document.getElementById('p-inst')||{value:''}).value.trim();
-  if(_n && _i) await salvarFormularioSupabase(false);
+  if(d>0 && !validarEtapa1(s1cur,true)) return;
+  await salvarFormularioSupabase(false);
   if(nx>=6){submitForm1();return;}
   goStep1(nx);
 }
 async function submitForm1(){
-  var nome=(document.getElementById('p-nome')||{value:''}).value.trim();
-  var inst=(document.getElementById('p-inst')||{value:''}).value.trim();
-  var emailEl=document.getElementById('p-email');
-  var email=emailEl ? emailEl.value.trim() : '';
-  if(!email && _currentUser) email = _currentUser.email || '';
-
+  for(var _v=0; _v<6; _v++){ if(!validarEtapa1(_v,true)){ goStep1(_v); return; } }
+  var nome=document.getElementById('p-nome').value;
+  var inst=document.getElementById('p-inst').value;
+  var email=(document.getElementById('p-email')||{value:''}).value.trim();
+  if(!nome || !inst || !email){ alert('Preencha nome, instituição e e-mail antes de finalizar.'); goStep1(0); return; }
   addWordsFromText((document.getElementById('q10-resp')||{value:''}).value+(document.getElementById('q11-resp')||{value:''}).value+(document.getElementById('q14-resp')||{value:''}).value);
-  if(nome) window._lastNome=nome;
-  if(inst) window._lastInst=inst;
-
-  /* 1. Salvar todos os dados do formulário na tabela inscritos */
-  await salvarFormularioSupabase(true);
-
-  /* 2. Marcar inscrito=true na tabela usuarios */
-  if(email) await supaMarcarInscrito(email);
-
-  /* 3. Atualizar sessão */
-  if(_currentUser){ _currentUser.inscrito=true; saveSession(_currentUser); }
-
-  /* 4. Array local para exibição imediata */
-  var foto=window._fotoDataURL||null;
+  if(nome)window._lastNome=nome;
+  if(inst)window._lastInst=inst;
+  var foto2=window._fotoDataURL||null;
   var perfilEl=document.querySelector('input[name="perf"]:checked');
-  var perfil=perfilEl?(perfilEl.parentElement.textContent||'').trim().replace(/\s+/g,' '):'';
-  var cargo=(document.getElementById('p-cargo')||{value:''}).value.trim();
-  if(nome && inst && typeof salvarInscrito==='function') salvarInscrito(nome,inst,foto,perfil,cargo);
-
+  var perfil2=perfilEl?(perfilEl.parentElement.textContent||'').trim().replace(/\s+/g,' '):'';
+  var cargo2=(document.getElementById('p-cargo')||{value:''}).value.trim();
+  if(nome&&inst&&typeof salvarInscrito==='function') salvarInscrito(nome,inst,foto2,perfil2,cargo2);
+  await salvarFormularioSupabase(true);
+  if(_currentUser){ _currentUser.formpreenchido=true; saveSession(_currentUser); }
   if(typeof salvarDadosDashboard==='function') salvarDadosDashboard();
   if(typeof spawnConfetti==='function') spawnConfetti();
   document.getElementById('f1-area').style.display='none';
@@ -2218,8 +2188,7 @@ function assinar(){
 }
 function renderCompGrid(id){
   var g=document.getElementById(id);if(!g)return;
-  var demos=[{nome:'Ana Carla Furtado',inst:'ENAP'},{nome:'Roberto Salles',inst:'Sec. Inovação/GDF'},{nome:'Marina Costa',inst:'Embrapa'},{nome:'Felipe Drumond',inst:'BID'},{nome:'Juliana Rios',inst:'UnB'}];
-  g.innerHTML=demos.concat(signatarios).map(function(s){return '<div class="comp-node"><div class="cn-name">'+esc(s.nome)+'</div><div class="cn-inst">'+esc(s.inst)+'</div></div>';}).join('');
+  g.innerHTML=signatarios.map(function(s){return '<div class="comp-node"><div class="cn-name">'+esc(s.nome)+'</div><div class="cn-inst">'+esc(s.inst)+'</div></div>';}).join('') || '<div style="font-size:11px;color:#8A9AB5;font-style:italic;padding:8px">Nenhum signatário ainda.</div>';
 }
 
 /* ─── DASHBOARD ─── */
@@ -2238,12 +2207,17 @@ function renderGrpStatus(){
 }
 function renderDores(){
   var el=document.getElementById('dores-list');if(!el)return;
-  el.innerHTML=demoDores.map(function(d){return '<div class="dr"><span>'+esc(d.txt)+'</span><span>'+d.n+'</span></div>';}).join('');
+  var arr=Object.entries(_barMap||{}).sort(function(a,b){return b[1]-a[1];});
+  if(!arr.length){ el.innerHTML='<div style="padding:12px;color:#8A9AB5;font-size:11px;font-style:italic">Aguardando preenchimento dos participantes.</div>'; return; }
+  el.innerHTML=arr.map(function(d){return '<div class="dr"><span>'+esc(d[0])+'</span><span>'+d[1]+'</span></div>';}).join('');
 }
 function renderPerfis(){
   var el=document.getElementById('perfis-bars');if(!el)return;
-  var max=Math.max.apply(null,demoPerfis.map(function(p){return p.n;}));
-  el.innerHTML=demoPerfis.map(function(p){return '<div class="br"><div class="brt"><span>'+esc(p.txt)+'</span><span>'+p.n+'</span></div><div class="bt"><div class="bfill" style="width:'+Math.round(p.n/max*100)+'%;background:'+p.c+'"></div></div></div>';}).join('');
+  var arr=Object.entries(_perfMap||{}).sort(function(a,b){return b[1]-a[1];});
+  if(!arr.length){ el.innerHTML='<div style="padding:12px;color:#8A9AB5;font-size:11px;font-style:italic">Aguardando preenchimento dos participantes.</div>'; return; }
+  var max=Math.max.apply(null,arr.map(function(p){return p[1];}))||1;
+  var cores=['#185FA5','#0F6E56','#534AB7','#BA7517','#993C1D','#3B6D11'];
+  el.innerHTML=arr.map(function(p,i){return '<div class="br"><div class="brt"><span>'+esc(p[0])+'</span><span>'+p[1]+'</span></div><div class="bt"><div class="bfill" style="width:'+Math.round(p[1]/max*100)+'%;background:'+cores[i%cores.length]+'"></div></div></div>';}).join('');
 }
 function renderVotesBars(){
   var el=document.getElementById('votes-bars');if(!el)return;
@@ -2728,8 +2702,7 @@ function gerarPDF() {
     +'<div class="gcircle" style="background:#E6F1FB;color:#042C53">✍</div>'
     +'<div class="gtitle">Signatários do Pacto pela Inovação</div></div>'
     +'<div class="sig-grid">'
-    +[{nome:'Ana Carla Furtado',inst:'ENAP'},{nome:'Roberto Salles',inst:'Sec. Inovação/GDF'},{nome:'Marina Costa',inst:'Embrapa'},{nome:'Felipe Drumond',inst:'BID'},{nome:'Juliana Rios',inst:'UnB'}]
-      .concat(signatarios).map(function(s){
+    +signatarios.map(function(s){
         return '<div class="sig-node"><div class="sn">'+esc(s.nome)+'</div><div class="si">'+esc(s.inst)+'</div></div>';
       }).join('')
     +'</div></div>';
@@ -2793,35 +2766,10 @@ window.addEventListener('load', function() {
    PARTICIPANTES & DASHBOARD — dados e helpers
 ════════════════════════════════════════════ */
 var SEED_INSCRITOS = [];
-var SEED_WORDS = {
-  'inovacao':18,'articulacao':15,'ecossistema':14,'governanca':12,
-  'colaboracao':11,'dados':10,'digital':9,'politicas':9,'capacitacao':8,
-  'financiamento':7,'participacao':7,'laboratorio':6,'redes':5,
-  'conhecimento':5,'transformacao':5,'design':4,'integracao':4,
-  'continuidade':4,'burocracia':3,'mandato':3,'silos':3
-};
-var SEED_TEMAS = {
-  'Transformação digital':18,'Articulação de redes e ecossistemas':15,
-  'Dados e interoperabilidade':13,'Inovação aberta':11,
-  'Laboratórios de inovação':10,'Gestão do conhecimento':9,
-  'Inteligência artificial':8,'Design de serviços públicos':7,
-  'Govtechs / startups':6,'Compras públicas de inovação':5
-};
-var SEED_BARREIRAS = {
-  'Baixa articulação entre instituições':21,
-  'Falta de continuidade das iniciativas':18,
-  'Barreiras jurídicas ou regulatórias':15,
-  'Cultura organizacional resistente à mudança':13,
-  'Dificuldade de financiamento/fomento':12,
-  'Falta de capacidade técnica de pessoas':9,
-  'Pouca troca de experiências e aprendizados':8,
-  'Dificuldade de escalar iniciativas':7
-};
-var SEED_PERFIS = {
-  'Governo e gestão pública':14,'Academia e pesquisa':8,
-  'Financiamento e fomento':6,'Hubs, redes e articulação':5,
-  'Formação e capacitação':4,'Controle, governança e regulação':3
-};
+var SEED_WORDS = {};
+var SEED_TEMAS = {};
+var SEED_BARREIRAS = {};
+var SEED_PERFIS = {};
 
 var _inscritos  = SEED_INSCRITOS.slice();
 var _wordMap    = Object.assign({}, SEED_WORDS);
@@ -2840,6 +2788,13 @@ function avColor(nome){
 function inicialNome(nome){
   var p=nome.trim().split(' ').filter(Boolean);
   return p.length>=2?(p[0][0]+p[p.length-1][0]).toUpperCase():nome.trim().substring(0,2).toUpperCase();
+}
+
+function configurarCamposObrigatorios(){
+  document.querySelectorAll('#f1-area input[type="text"],#f1-area input[type="email"],#f1-area input[type="tel"],#f1-area textarea,#auth-card-screen input').forEach(function(el){ el.required=true; });
+  var file=document.getElementById('upl-input'); if(file) file.required=true;
+  var conf=document.querySelector('input[name="conf"]'); if(conf) conf.required=true;
+  var perf=document.querySelector('input[name="perf"]'); if(perf) perf.required=true;
 }
 
 var STOP=new Set(['de','a','o','e','em','para','que','com','da','do','as','os',
@@ -3439,28 +3394,11 @@ var _authMode = 'cadastro';  /* 'cadastro' | 'login' */
 var _currentUser = null;     /* { nome, inst, email, senha, inscrito, presente } */
 
 /* ── Storage helpers ── */
-/* localStorage removido — auth via Supabase tabela usuarios */
-function getUsers() { return {}; }
-function saveUsers(u) {}
-
-async function supaGetUsuario(email) {
-  var sb = getSupabase(); if (!sb) return null;
-  try {
-    var r = await sb.from('usuarios').select('*').eq('email', email).maybeSingle();
-    return (r && r.data) ? r.data : null;
-  } catch(e) { return null; }
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem('cpi-users') || '{}'); } catch(e) { return {}; }
 }
-async function supaCriarUsuario(email, senha, nome, inst) {
-  var sb = getSupabase(); if (!sb) return { error: 'Supabase indisponível' };
-  try {
-    var r = await sb.from('usuarios').insert({ email:email, senha:senha, nome:nome, inst:inst, inscrito:false, presente:false });
-    if (r.error) return { error: r.error.message };
-    return { ok: true };
-  } catch(e) { return { error: String(e) }; }
-}
-async function supaMarcarInscrito(email) {
-  var sb = getSupabase(); if (!sb) return;
-  try { await sb.from('usuarios').update({ inscrito: true }).eq('email', email); } catch(e) {}
+function saveUsers(u) {
+  try { localStorage.setItem('cpi-users', JSON.stringify(u)); } catch(e) {}
 }
 function getSession() {
   try { return JSON.parse(sessionStorage.getItem('cpi-session') || 'null'); } catch(e) { return null; }
@@ -3484,7 +3422,6 @@ function showAuth(mode) {
   document.getElementById('splash-screen').style.display = 'none';
   document.getElementById('auth-card-screen').style.display = 'flex';
   document.getElementById('participant-area').style.display = 'none';
-  document.getElementById('auth-submit-btn').disabled = false;
   switchAuthMode(mode);
   setTimeout(function() {
     var first = mode === 'cadastro'
@@ -3508,7 +3445,6 @@ function switchAuthMode(mode) {
     ? 'Já tem cadastro? <button onclick="switchAuthMode(\'login\')">Entrar</button>'
     : 'Ainda não tem cadastro? <button onclick="switchAuthMode(\'cadastro\')">Inscrever-se</button>';
   document.getElementById('auth-error').classList.remove('show');
-  document.getElementById('auth-submit-btn').disabled = false;
   /* Clear password fields */
   document.getElementById('auth-senha').value = '';
   if (document.getElementById('auth-confirma')) document.getElementById('auth-confirma').value = '';
@@ -3551,85 +3487,68 @@ async function submitAuth() {
   btn.disabled = true;
   btn.textContent = 'Aguarde...';
 
-  function resetBtn() {
-    btn.disabled = false;
-    btn.textContent = _authMode === 'cadastro' ? 'Criar cadastro e continuar' : 'Entrar';
-  }
+  var email = (document.getElementById('auth-email').value || '').trim().toLowerCase();
+  var senha = document.getElementById('auth-senha').value || '';
 
-  try {
-    var email = (document.getElementById('auth-email').value || '').trim().toLowerCase();
-    var senha = document.getElementById('auth-senha').value || '';
-    if (!email || !senha) { showAuthError('Preencha e-mail e senha.'); resetBtn(); return; }
+  if (!email || !senha) { showAuthError('Preencha e-mail e senha.'); return; }
+  var sb=getSupabase();
+  var users = getUsers();
 
-    if (_authMode === 'cadastro') {
-      var nome     = (document.getElementById('auth-nome').value || '').trim();
-      var inst     = (document.getElementById('auth-inst').value || '').trim();
-      var confirma = document.getElementById('auth-confirma').value || '';
-      if (!nome) { showAuthError('Informe seu nome completo.'); resetBtn(); return; }
-      if (!inst) { showAuthError('Informe sua instituição.'); resetBtn(); return; }
-      if (senha.length < 6) { showAuthError('A senha deve ter pelo menos 6 caracteres.'); resetBtn(); return; }
-      if (senha !== confirma) { showAuthError('As senhas não conferem.'); resetBtn(); return; }
+  if (_authMode === 'cadastro') {
+    var nome     = (document.getElementById('auth-nome').value || '').trim();
+    var inst     = (document.getElementById('auth-inst').value || '').trim();
+    var confirma = document.getElementById('auth-confirma').value || '';
+    if (!nome || !inst) { showAuthError('Informe nome e instituição.'); return; }
+    if (senha.length < 6) { showAuthError('A senha deve ter pelo menos 6 caracteres.'); return; }
+    if (senha !== confirma) { showAuthError('As senhas não conferem.'); return; }
 
-      /* Verificar duplicata na tabela usuarios */
-      var existente = await supaGetUsuario(email);
-      if (existente) { showAuthError('Esse e-mail já está cadastrado. Faça login.'); resetBtn(); return; }
+    var senhaHash=await hashSenha(senha);
+    if(sb){
+      var chk=await sb.from('inscritos').select('*').eq('email',email).maybeSingle();
+      if(chk.data && chk.data.senha_hash){ showAuthError('Esse e-mail já está cadastrado. Faça login.'); return; }
+    } else if (users[email]) { showAuthError('Esse e-mail já está cadastrado. Faça login.'); return; }
 
-      var res = await supaCriarUsuario(email, senha, nome, inst);
-      if (res.error) { showAuthError('Erro ao cadastrar: ' + res.error); resetBtn(); return; }
-
-      var newUser = { nome:nome, inst:inst, email:email, inscrito:false, presente:false };
-      saveSession(newUser);
-      _currentUser = newUser;
-
-      setTimeout(function() {
-        var nomeEl  = document.getElementById('p-nome');
-        var instEl  = document.getElementById('p-inst');
-        var emailEl = document.getElementById('p-email');
-        if (nomeEl)  nomeEl.value  = nome;
-        if (instEl)  instEl.value  = inst;
-        if (emailEl) emailEl.value = email;
-      }, 100);
-
-      document.getElementById('auth-layer').classList.add('hidden');
-      setTimeout(function() {
-        var t1btn = document.querySelector('[data-tab="t1"]');
-        if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
-      }, 100);
-
-    } else {
-      /* LOGIN — busca na tabela usuarios */
-      var user = await supaGetUsuario(email);
-      if (!user) { showAuthError('E-mail não encontrado. Faça seu cadastro.'); resetBtn(); return; }
-      if (user.senha !== senha) { showAuthError('Senha incorreta.'); resetBtn(); return; }
-
-      _currentUser = user;
-      saveSession(user);
-
-      if (!user.inscrito) {
-        setTimeout(function() {
-          var nomeEl  = document.getElementById('p-nome');
-          var instEl  = document.getElementById('p-inst');
-          var emailEl = document.getElementById('p-email');
-          if (nomeEl)  nomeEl.value  = user.nome;
-          if (instEl)  instEl.value  = user.inst;
-          if (emailEl) emailEl.value = email;
-          preencherFormularioComRegistro(user);
-        }, 100);
-        document.getElementById('auth-layer').classList.add('hidden');
-        setTimeout(function() {
-          var t1btn = document.querySelector('[data-tab="t1"]');
-          if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
-        }, 100);
-      } else {
-        showParticipantArea(user);
-      }
+    var newUser = { nome:nome, inst:inst, orgao:inst, email:email, senha_hash:senhaHash, inscrito:true, presente:false, ts:Date.now(), formpreenchido:false };
+    if(sb){
+      var saved=await salvarRegistroSupabase({nome:nome, inst:inst, orgao:inst, email:email, senha_hash:senhaHash, presenca_confirmada:false, updated_at:new Date().toISOString()});
+      if(saved) newUser=Object.assign(newUser,saved,{foto:saved.foto_base64||saved.foto_url||null, presente:!!saved.presenca_confirmada});
     }
-  } catch(e) {
-    console.warn('submitAuth error:', e);
-    showAuthError('Erro inesperado. Tente novamente.');
-    resetBtn();
+    users[email] = newUser; saveUsers(users); saveSession(newUser); _currentUser = newUser;
+
+    setTimeout(function() {
+      var nomeEl = document.getElementById('p-nome');
+      var instEl = document.getElementById('p-inst');
+      var emailEl = document.getElementById('p-email');
+      if (nomeEl) nomeEl.value = nome;
+      if (instEl) instEl.value = inst;
+      if (emailEl) emailEl.value = email;
+    }, 100);
+
+    document.getElementById('auth-layer').classList.add('hidden');
+    setTimeout(function() { var t1btn = document.querySelector('[data-tab="t1"]'); if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn); }, 100);
+  } else {
+    var user=null;
+    var senhaHash=await hashSenha(senha);
+    if(sb){
+      var res=await sb.from('inscritos').select('*').eq('email',email).maybeSingle();
+      if(res.error){ showAuthError('Erro ao consultar o Supabase: '+res.error.message); return; }
+      if(res.data) user=Object.assign({},res.data,{foto:res.data.foto_base64||res.data.foto_url||null,presente:!!res.data.presenca_confirmada});
+    }
+    if(!user) user=users[email];
+    if (!user) { showAuthError('E-mail não encontrado. Faça seu cadastro.'); return; }
+    var okSenha = (user.senha_hash && user.senha_hash===senhaHash) || (user.senha && user.senha===senha);
+    if (!okSenha) { showAuthError('Senha incorreta.'); return; }
+    _currentUser=user; saveSession(user); users[email]=user; saveUsers(users);
+    preencherFormularioComRegistro(user);
+    if (!(user.formpreenchido||user.formPreenchido) && !user.expectativas && !user.contexto) {
+      document.getElementById('auth-layer').classList.add('hidden');
+      setTimeout(function() { var t1btn = document.querySelector('[data-tab="t1"]'); if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn); }, 100);
+    } else {
+      showParticipantArea(user);
+    }
   }
 }
+
 function showAuthError(msg) {
   var el = document.getElementById('auth-error');
   el.textContent = msg;
@@ -3739,44 +3658,35 @@ function gerarComprovanteParticipante() {
   if (document.getElementById('p-inst')) document.getElementById('p-inst').value = saved_inst;
 }
 
-/* ── On load: check session (Supabase usuarios) ── */
+/* ── On load: check session ── */
 window.addEventListener('load', async function() {
   var session = getSession();
   if (session && session.email) {
-    var user = await supaGetUsuario(session.email);
-    if (!user) { showSplash(); return; }
-    _currentUser = user;
-    saveSession(user);
-    if (user.inscrito) {
-      showParticipantArea(user);
-    } else {
-      preencherFormularioComRegistro(user);
-      document.getElementById('auth-layer').classList.add('hidden');
-      var t1btn = document.querySelector('[data-tab="t1"]');
-      if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
+    var users = getUsers();
+    var user  = users[session.email] || session;
+    var sb = getSupabase();
+    if (sb) {
+      try {
+        var res = await sb.from('inscritos').select('*').eq('email', session.email).maybeSingle();
+        if (res.data) user = Object.assign({}, user, res.data, {foto:res.data.foto_base64||res.data.foto_url||user.foto, presente:!!res.data.presenca_confirmada});
+      } catch(e) {}
     }
+    _currentUser = user;
+    preencherFormularioComRegistro(user);
+    if ((user.formpreenchido||user.formPreenchido) || user.expectativas || user.contexto) showParticipantArea(user);
+    else { document.getElementById('auth-layer').classList.add('hidden'); var t1btn=document.querySelector('[data-tab="t1"]'); if(t1btn&&typeof switchTab==='function') switchTab('t1',t1btn); }
   } else {
     showSplash();
   }
   setTimeout(function(){
-    var area = document.getElementById('f1-area');
+    var area=document.getElementById('f1-area');
     if(area){
-      area.addEventListener('change', function(){
-        var n=(document.getElementById('p-nome')||{value:''}).value.trim();
-        var i=(document.getElementById('p-inst')||{value:''}).value.trim();
-        if(n && i) salvarFormularioSupabase(false);
-      });
-      area.addEventListener('input', function(){
-        clearTimeout(window._autosaveT);
-        window._autosaveT=setTimeout(function(){
-          var n=(document.getElementById('p-nome')||{value:''}).value.trim();
-          var i=(document.getElementById('p-inst')||{value:''}).value.trim();
-          if(n && i) salvarFormularioSupabase(false);
-        },1500);
-      });
+      area.addEventListener('change', function(){ salvarFormularioSupabase(false); });
+      area.addEventListener('input', function(){ clearTimeout(window._autosaveT); window._autosaveT=setTimeout(function(){salvarFormularioSupabase(false);},900); });
     }
   },500);
 });
+
 /* Enter on password field */
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
@@ -3804,11 +3714,9 @@ function renderRanking(){
   var emptyEl=document.getElementById('rk-empty');
   if(!grid) return;
   if(totalEl) totalEl.textContent=_inscritos.length;
-  if(!_inscritos.length){ if(emptyEl) emptyEl.style.display='flex'; return; }
-  if(emptyEl) emptyEl.style.display='none';
-  var existing=new Set(Array.from(grid.querySelectorAll('.av-card')).map(function(c){return c.dataset.nome;}));
+  grid.innerHTML='';
+  if(!_inscritos.length){ grid.innerHTML='<div class="rk-empty" id="rk-empty"><i class="ti ti-users"></i><p style="font-size:12px;text-align:center">Nenhum inscrito ainda.<br>Os participantes aparecerão aqui após o cadastro no Supabase.</p></div>'; return; }
   _inscritos.forEach(function(p){
-    if(existing.has(p.nome)) return;
     var col=avColor(p.nome), ini=inicialNome(p.nome);
     var card=document.createElement('div');
     card.className='av-card';
@@ -3846,8 +3754,7 @@ function renderRanking(){
     orgEl.style.cssText='font-size:10px;color:#8A9AB5;line-height:1.3;';
     orgEl.textContent=p.inst||'';
     card.appendChild(orgEl);
-    if(emptyEl&&emptyEl.parentNode===grid) grid.insertBefore(card,emptyEl);
-    else grid.appendChild(card);
+    grid.appendChild(card);
     /* Tooltip */
     (function(pp){
       card.addEventListener('mouseenter',function(){
