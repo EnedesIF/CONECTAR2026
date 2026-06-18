@@ -1753,40 +1753,73 @@ function goStep1(n){
   var el=document.getElementById('f1s'+n);if(el)el.classList.add('active');
   s1cur=n;updateS1Nav();updateStepper('s1-stepper',n,6);
 }
+function mostrarErro(msg, el) {
+  /* Feedback visual + alert */
+  if(el){ el.style.borderColor='#993C1D'; el.focus(); setTimeout(function(){ el.style.borderColor=''; },2000); }
+  alert(msg);
+  return false;
+}
+
 function validarEtapa(n){
+  /* ── Etapa 0: Identificação ── */
   if(n===0){
-    var nome=document.getElementById('p-nome');
-    var inst=document.getElementById('p-inst');
-    var cargo=document.getElementById('p-cargo');
-    var emailEl=document.getElementById('p-email');
-    var conf=document.querySelector('input[name="conf"]:checked');
-    if(!nome||!nome.value.trim()){alert('Informe seu nome completo.');nome.focus();return false;}
-    if(!inst||!inst.value.trim()){alert('Informe sua instituição.');inst.focus();return false;}
-    if(!cargo||!cargo.value.trim()){alert('Informe seu cargo/função.');cargo.focus();return false;}
-    if(!emailEl||!emailEl.value.trim()){alert('Informe seu e-mail institucional.');emailEl.focus();return false;}
-    if(!conf){alert('Confirme sua presença na oficina.');return false;}
+    var nome  = document.getElementById('p-nome');
+    var inst  = document.getElementById('p-inst');
+    var cargo = document.getElementById('p-cargo');
+    var email = document.getElementById('p-email');
+    var tel   = document.getElementById('p-telefone');
+    var conf  = document.querySelector('input[name="conf"]:checked');
+    if(!nome  ||!nome.value.trim())  return mostrarErro('Informe seu nome completo.', nome);
+    if(!inst  ||!inst.value.trim())  return mostrarErro('Informe sua instituição / organização.', inst);
+    if(!cargo ||!cargo.value.trim()) return mostrarErro('Informe seu cargo / função.', cargo);
+    if(!email ||!email.value.trim()) return mostrarErro('Informe seu e-mail institucional.', email);
+    if(!tel   ||!tel.value.trim())   return mostrarErro('Informe seu telefone de contato.', tel);
+    if(!conf) return mostrarErro('Confirme sua presença na oficina.');
   }
+  /* ── Etapa 1: Perfil ── */
   if(n===1){
-    var perf=document.querySelector('input[name="perf"]:checked');
-    if(!perf){alert('Selecione o perfil da sua instituição.');return false;}
+    var perf = document.querySelector('input[name="perf"]:checked');
+    if(!perf) return mostrarErro('Selecione o perfil da sua instituição.');
   }
+  /* ── Etapa 2: Contribuição ── */
   if(n===2){
-    var contribs=document.querySelectorAll('#f1s2 .cbg:first-of-type input[type="checkbox"]:checked');
-    if(!contribs.length){alert('Marque pelo menos uma forma de contribuição da sua instituição.');return false;}
+    /* Primeiro bloco de checkboxes — contribuição */
+    var cbs = document.querySelectorAll('#f1s2 .cbg:first-of-type input[type="checkbox"]');
+    var temContrib = Array.from(cbs).some(function(cb){ return cb.checked; });
+    if(!temContrib) return mostrarErro('Marque pelo menos uma forma de contribuição da sua instituição.');
+    /* Temas (não obrigatório — deixa passar) */
+    /* O que pode oferecer (textarea) — obrigatório */
+    var oferta = document.getElementById('q10-resp');
+    if(!oferta||!oferta.value.trim()) return mostrarErro('Descreva o que sua instituição pode oferecer ao ecossistema.', oferta);
   }
+  /* ── Etapa 3: Desafios ── */
   if(n===3){
-    var q11=document.getElementById('q11-resp');
-    var barr=document.querySelector('.bar-cb:checked');
-    if(!q11||!q11.value.trim()){alert('Descreva o principal obstáculo que você enfrenta.');q11.focus();return false;}
-    if(!barr){alert('Selecione pelo menos uma barreira crítica.');return false;}
+    var q11  = document.getElementById('q11-resp');
+    var barr = document.querySelector('.bar-cb:checked');
+    if(!q11||!q11.value.trim()) return mostrarErro('Descreva o principal obstáculo que você enfrenta.', q11);
+    if(!barr) return mostrarErro('Selecione pelo menos uma barreira crítica.');
   }
+  /* ── Etapa 4: Contexto — todos os textareas obrigatórios ── */
   if(n===4){
-    var tas=document.querySelectorAll('#f1s4 textarea');
-    for(var i=0;i<tas.length;i++){if(!tas[i].value.trim()){alert('Preencha todos os campos desta etapa.');tas[i].focus();return false;}}
+    var labels4=['Meu papel neste ecossistema','O que estou tentando avançar','O que trava esse avanço','Por que isso persiste','O que me motiva a continuar','O que preciso desta oficina'];
+    var tas4 = document.querySelectorAll('#f1s4 textarea');
+    for(var i=0;i<tas4.length;i++){
+      if(!tas4[i].value.trim()){
+        var lbl = labels4[i] || ('Campo '+(i+1));
+        return mostrarErro('Preencha o campo "'+lbl+'".', tas4[i]);
+      }
+    }
   }
+  /* ── Etapa 5: Expectativas — todos os textareas obrigatórios ── */
   if(n===5){
-    var exp=document.querySelectorAll('#f1s5 textarea');
-    for(var i=0;i<exp.length;i++){if(!exp[i].value.trim()){alert('Preencha todos os campos desta etapa.');exp[i].focus();return false;}}
+    var labels5=['O que faria esta oficina valer o seu tempo','Daqui a 1 ano, como você saberia que avançamos'];
+    var tas5 = document.querySelectorAll('#f1s5 textarea');
+    for(var i=0;i<tas5.length;i++){
+      if(!tas5[i].value.trim()){
+        var lbl5 = labels5[i] || ('Campo '+(i+1));
+        return mostrarErro('Preencha o campo "'+lbl5+'".', tas5[i]);
+      }
+    }
   }
   return true;
 }
@@ -1794,7 +1827,10 @@ async function stepNav1(d){
   var nx=s1cur+d;
   if(nx<0)return;
   if(d>0 && !validarEtapa(s1cur)) return;
-  await salvarFormularioSupabase(false);
+  /* Só salva se dados mínimos presentes */
+  var _n=(document.getElementById('p-nome')||{value:''}).value.trim();
+  var _i=(document.getElementById('p-inst')||{value:''}).value.trim();
+  if(_n && _i) await salvarFormularioSupabase(false);
   if(nx>=6){submitForm1();return;}
   goStep1(nx);
 }
@@ -3770,8 +3806,19 @@ window.addEventListener('load', async function() {
   setTimeout(function(){
     var area=document.getElementById('f1-area');
     if(area){
-      area.addEventListener('change', function(){ salvarFormularioSupabase(false); });
-      area.addEventListener('input', function(){ clearTimeout(window._autosaveT); window._autosaveT=setTimeout(function(){salvarFormularioSupabase(false);},900); });
+      area.addEventListener('change', function(){
+        var nome=(document.getElementById('p-nome')||{value:''}).value.trim();
+        var inst=(document.getElementById('p-inst')||{value:''}).value.trim();
+        if(nome && inst) salvarFormularioSupabase(false);
+      });
+      area.addEventListener('input', function(){
+        clearTimeout(window._autosaveT);
+        window._autosaveT=setTimeout(function(){
+          var nome=(document.getElementById('p-nome')||{value:''}).value.trim();
+          var inst=(document.getElementById('p-inst')||{value:''}).value.trim();
+          if(nome && inst) salvarFormularioSupabase(false);
+        },1500);
+      });
     }
   },500);
 });
