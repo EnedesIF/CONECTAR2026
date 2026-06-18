@@ -1771,8 +1771,8 @@ function validarEtapa(n){
     if(!perf){alert('Selecione o perfil da sua instituição.');return false;}
   }
   if(n===2){
-    var contrib=document.querySelector('#f1s2 .fi:first-of-type input[type="checkbox"]:checked');
-    if(!contrib){alert('Marque pelo menos uma forma de contribuição.');return false;}
+    var contribs=document.querySelectorAll('#f1s2 .cbg:first-of-type input[type="checkbox"]:checked');
+    if(!contribs.length){alert('Marque pelo menos uma forma de contribuição da sua instituição.');return false;}
   }
   if(n===3){
     var q11=document.getElementById('q11-resp');
@@ -3558,6 +3558,9 @@ async function submitAuth() {
     btn.textContent = _authMode === 'cadastro' ? 'Criar cadastro e continuar' : 'Entrar';
   }
 
+  /* Garantir que o botão sempre volta ao normal, mesmo com erro inesperado */
+  try {
+
   var email = (document.getElementById('auth-email').value || '').trim().toLowerCase();
   var senha = document.getElementById('auth-senha').value || '';
 
@@ -3627,7 +3630,14 @@ async function submitAuth() {
       showParticipantArea(user);
     }
   }
+  } catch(e) {
+    console.warn('submitAuth error:', e);
+    document.getElementById('auth-submit-btn').disabled = false;
+    document.getElementById('auth-submit-btn').textContent = _authMode==='cadastro'?'Criar cadastro e continuar':'Entrar';
+    showAuthError('Erro inesperado. Tente novamente.');
+  }
 }
+
 function showAuthError(msg) {
   var el = document.getElementById('auth-error');
   el.textContent = msg;
