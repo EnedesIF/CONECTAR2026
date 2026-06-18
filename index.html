@@ -3542,14 +3542,20 @@ function copyAIOutput(btn) {
 ════════════════════════════════════════════ */
 var _authMode = 'cadastro';  /* 'cadastro' | 'login' */
 var _currentUser = null;     /* { nome, inst, email, senha, inscrito, presente } */
+var _sessionMemory = null;   /* fallback quando sessionStorage é bloqueado */
 
 /* ── Storage helpers ── */
 function getUsers() { return {}; }
 function saveUsers(u) {}
 function getSession() {
-  try { return JSON.parse(sessionStorage.getItem('cpi-session') || 'null'); } catch(e) { return null; }
+  try {
+    var s = sessionStorage.getItem('cpi-session');
+    if (s) return JSON.parse(s);
+  } catch(e) {}
+  return _sessionMemory || null;
 }
 function saveSession(u) {
+  _sessionMemory = u;
   try { sessionStorage.setItem('cpi-session', JSON.stringify(u)); } catch(e) {}
 }
 
@@ -3741,12 +3747,25 @@ function voltarParaSplash(){
 
 function enterApp() {
   document.getElementById('auth-layer').classList.add('hidden');
+  /* Preenche o formulário com os dados do usuário logado */
+  if (_currentUser) {
+    setTimeout(function() {
+      var nomeEl  = document.getElementById('p-nome');
+      var instEl  = document.getElementById('p-inst');
+      var emailEl = document.getElementById('p-email');
+      if (nomeEl)  nomeEl.value  = _currentUser.nome || '';
+      if (instEl)  instEl.value  = _currentUser.inst || _currentUser.orgao || '';
+      if (emailEl) emailEl.value = _currentUser.email || '';
+      if (typeof preencherFormularioComRegistro === 'function') preencherFormularioComRegistro(_currentUser);
+    }, 80);
+  }
   var t1btn = document.querySelector('[data-tab="t1"]');
   if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
 }
 
 /* ── Logout ── */
 function logoutParticipant() {
+  _sessionMemory = null;
   try { sessionStorage.removeItem('cpi-session'); } catch(e) {}
   _currentUser = null;
   showSplash();
