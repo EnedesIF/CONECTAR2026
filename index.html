@@ -1526,17 +1526,29 @@ function getSupabase() {
    SUPABASE AUTH COMPAT — usa a tabela public.inscritos
    Corrige erro: supaGetUsuario is not defined
 ───────────────────────────────────────────── */
+
+function supaTimeout(promise, ms, label){
+  return Promise.race([
+    promise,
+    new Promise(function(_, reject){
+      setTimeout(function(){ reject(new Error((label || 'Operação') + ' demorou demais. Verifique conexão/Supabase.')); }, ms || 12000);
+    })
+  ]);
+}
+
 async function supaGetUsuario(email){
   email = normalizarEmail(email);
   if(!email) return null;
   const sb = getSupabase();
-  if(!sb) return null;
+  if(!sb) { console.warn('Supabase não carregou.'); return null; }
   try{
-    const {data,error} = await sb
+    const query = sb
       .from('inscritos')
       .select('*')
       .eq('email', email)
+      .limit(1)
       .maybeSingle();
+    const {data,error} = await supaTimeout(query, 12000, 'Busca do usuário');
     if(error){ console.warn('supaGetUsuario error:', error.message); return null; }
     if(!data) return null;
     return Object.assign({}, data, {
@@ -1567,13 +1579,14 @@ async function supaCriarUsuario(email, senha, nome, inst){
       formpreenchido: false,
       updated_at: new Date().toISOString()
     };
-    const {data,error} = await sb
+    const query = sb
       .from('inscritos')
       .upsert(payload,{onConflict:'email'})
       .select('*')
-      .single();
+      .maybeSingle();
+    const {data,error} = await supaTimeout(query, 12000, 'Criação do cadastro');
     if(error){ console.warn('supaCriarUsuario error:', error.message); return {error:error.message}; }
-    return {data:data};
+    return {data:data || payload};
   }catch(e){ console.warn('supaCriarUsuario exception:', e); return {error:String(e && e.message ? e.message : e)}; }
 }
 
@@ -3583,17 +3596,17 @@ function showParticipantArea(user) {
 async function submitAuth() {
   var btn   = document.getElementById('auth-submit-btn');
   var errEl = document.getElementById('auth-error');
-  errEl.classList.remove('show');
-  btn.disabled = true;
-  btn.textContent = 'Aguarde...';
+  if (errEl) errEl.classList.remove('show');
+  if (btn) { btn.disabled = true; btn.textContent = 'Aguarde...'; }
 
   function resetBtn() {
+    if (!btn) return;
     btn.disabled = false;
     btn.textContent = _authMode === 'cadastro' ? 'Criar cadastro e continuar' : 'Entrar';
   }
 
   try {
-    var email = (document.getElementById('auth-email').value || '').trim().toLowerCase();
+    var email = normalizarEmail((document.getElementById('auth-email').value || ''));
     var senha = document.getElementById('auth-senha').value || '';
     if (!email || !senha) { showAuthError('Preencha e-mail e senha.'); resetBtn(); return; }
 
@@ -3607,12 +3620,16 @@ async function submitAuth() {
       if (senha !== confirma) { showAuthError('As senhas não conferem.'); resetBtn(); return; }
 
       var existente = await supaGetUsuario(email);
-      if (existente) { showAuthError('Esse e-mail já está cadastrado. Faça login.'); resetBtn(); return; }
+      if (existente && existente.senha) {
+        showAuthError('Esse e-mail já está cadastrado. Clique em Entrar.');
+        resetBtn();
+        return;
+      }
 
       var res = await supaCriarUsuario(email, senha, nome, inst);
-      if (res.error) { showAuthError('Erro ao cadastrar: ' + res.error); resetBtn(); return; }
+      if (res && res.error) { showAuthError('Erro ao cadastrar: ' + res.error); resetBtn(); return; }
 
-      var newUser = { nome:nome, inst:inst, email:email, inscrito:false, presente:false };
+      var newUser = Object.assign({ nome:nome, inst:inst, orgao:inst, email:email, senha:senha, inscrito:false, presente:false }, (res && res.data) || {});
       saveSession(newUser);
       _currentUser = newUser;
 
@@ -3623,54 +3640,54 @@ async function submitAuth() {
         if (nomeEl)  nomeEl.value  = nome;
         if (instEl)  instEl.value  = inst;
         if (emailEl) emailEl.value = email;
-      }, 100);
+      }, 50);
 
       document.getElementById('auth-layer').classList.add('hidden');
+      resetBtn();
       setTimeout(function() {
         var t1btn = document.querySelector('[data-tab="t1"]');
         if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
-      }, 100);
+      }, 80);
 
     } else {
-      /* LOGIN — tabela usuarios */
       var user = await supaGetUsuario(email);
       if (!user) { showAuthError('E-mail não encontrado. Faça seu cadastro.'); resetBtn(); return; }
-      if (user.senha !== senha) { showAuthError('Senha incorreta.'); resetBtn(); return; }
+      if ((user.senha || '') !== senha) { showAuthError('Senha incorreta.'); resetBtn(); return; }
 
       _currentUser = user;
       saveSession(user);
+      resetBtn();
 
       if (!user.inscrito) {
         setTimeout(function() {
           var nomeEl  = document.getElementById('p-nome');
           var instEl  = document.getElementById('p-inst');
           var emailEl = document.getElementById('p-email');
-          if (nomeEl)  nomeEl.value  = user.nome;
-          if (instEl)  instEl.value  = user.inst;
+          if (nomeEl)  nomeEl.value  = user.nome || '';
+          if (instEl)  instEl.value  = user.inst || user.orgao || '';
           if (emailEl) emailEl.value = email;
-          preencherFormularioComRegistro(user);
-        }, 100);
+          if (typeof preencherFormularioComRegistro === 'function') preencherFormularioComRegistro(user);
+        }, 50);
         document.getElementById('auth-layer').classList.add('hidden');
         setTimeout(function() {
           var t1btn = document.querySelector('[data-tab="t1"]');
           if (t1btn && typeof switchTab === 'function') switchTab('t1', t1btn);
-        }, 100);
+        }, 80);
       } else {
         showParticipantArea(user);
       }
     }
   } catch(e) {
     console.warn('submitAuth error:', e);
-    showAuthError('Erro inesperado. Tente novamente.');
+    showAuthError('Erro inesperado: ' + (e && e.message ? e.message : 'tente novamente.'));
     resetBtn();
   }
 }
 function showAuthError(msg) {
   var el = document.getElementById('auth-error');
-  el.textContent = msg;
-  el.classList.add('show');
-  document.getElementById('auth-submit-btn').disabled = false;
-  document.getElementById('auth-submit-btn').textContent = _authMode==='cadastro'?'Criar cadastro e continuar':'Entrar';
+  if (el) { el.textContent = msg; el.classList.add('show'); }
+  var btn = document.getElementById('auth-submit-btn');
+  if (btn) { btn.disabled = false; btn.textContent = _authMode==='cadastro'?'Criar cadastro e continuar':'Entrar'; }
 }
 
 /* ── Enter app ── */
