@@ -1551,22 +1551,6 @@ async function supaGetUsuario(email){
     const {data,error} = await supaTimeout(query, 12000, 'Busca do usuário');
     if(error){ console.warn('supaGetUsuario error:', error.message); return null; }
     if(!data) return null;
-    /* Normalizar dados_contexto e dados_expectativas para suportar ambos os formatos */
-    var dadosCtx = data.dados_contexto || {};
-    if(dadosCtx && typeof dadosCtx === 'string'){ try{ dadosCtx=JSON.parse(dadosCtx); }catch(e){ dadosCtx={}; } }
-    /* Compatibilidade: se contexto veio como texto simples, montar array textos */
-    if(data.contexto && (!dadosCtx.textos || !dadosCtx.textos.length)){
-      dadosCtx.textos = data.contexto.split('\n\n');
-    }
-    var dadosExp = data.dados_expectativas || {};
-    if(dadosExp && typeof dadosExp === 'string'){ try{ dadosExp=JSON.parse(dadosExp); }catch(e){ dadosExp={}; } }
-    if(data.expectativas && (!dadosExp.textos || !dadosExp.textos.length)){
-      dadosExp.textos = data.expectativas.split('\n\n');
-    }
-    var dadosPerfil = data.dados_perfil || {};
-    if(dadosPerfil && typeof dadosPerfil === 'string'){ try{ dadosPerfil=JSON.parse(dadosPerfil); }catch(e){ dadosPerfil={}; } }
-    var dadosDesafios = data.dados_desafios || {};
-    if(dadosDesafios && typeof dadosDesafios === 'string'){ try{ dadosDesafios=JSON.parse(dadosDesafios); }catch(e){ dadosDesafios={}; } }
     return Object.assign({}, data, {
       email: email,
       nome: data.nome || '',
@@ -1575,11 +1559,7 @@ async function supaGetUsuario(email){
       foto: data.foto_base64 || data.foto_url || null,
       presente: !!data.presenca_confirmada,
       inscrito: !!(data.formpreenchido || data.formPreenchido || data.expectativas || data.contexto),
-      senha: data.senha_hash || data.senha || '',
-      dados_contexto: dadosCtx,
-      dados_expectativas: dadosExp,
-      dados_perfil: dadosPerfil,
-      dados_desafios: dadosDesafios
+      senha: data.senha_hash || data.senha || ''
     });
   }catch(e){ console.warn('supaGetUsuario exception:', e); return null; }
 }
@@ -1663,66 +1643,10 @@ function preencherFormularioComRegistro(r){
   var set=function(id,v){ var el=document.getElementById(id); if(el && v!=null) el.value=v; };
   set('p-nome', r.nome); set('p-inst', r.inst || r.orgao); set('p-cargo', r.cargo); set('p-email', r.email); set('p-telefone', r.telefone);
   if(r.foto_base64){ window._fotoDataURL=r.foto_base64; var prev=document.getElementById('upl-preview'); if(prev) prev.innerHTML='<img src="'+r.foto_base64+'" style="width:100%;height:100%;object-fit:cover">'; }
-
-  /* Restaurar perfil (radio) */
-  if(r.perfil){
-    document.querySelectorAll('input[name="perf"]').forEach(function(input){
-      var label=input.closest('label');
-      var texto=label ? (label.textContent||'').replace(/\s+/g,' ').trim() : '';
-      if(texto && r.perfil && texto.indexOf(r.perfil.substring(0,20))>=0) input.checked=true;
-    });
-  }
-
-  /* Restaurar confirmação de presença */
-  if(r.presenca_confirmada){
-    document.querySelectorAll('input[name="conf"]').forEach(function(input){ input.checked=true; });
-  }
-
-  /* Restaurar contribuição */
+  var dados=r.dados_contexto || {}; if(dados.textos){ document.querySelectorAll('#f1s4 textarea').forEach(function(t,i){ if(dados.textos[i]!=null) t.value=dados.textos[i]; }); }
+  var dex=r.dados_expectativas || {}; if(dex.textos){ document.querySelectorAll('#f1s5 textarea').forEach(function(t,i){ if(dex.textos[i]!=null) t.value=dex.textos[i]; }); }
   if(r.contribuicao){ var q=document.getElementById('q10-resp'); if(q) q.value=r.contribuicao; }
-
-  /* Restaurar desafios */
   if(r.desafios){ var q=document.getElementById('q11-resp'); if(q) q.value=r.desafios; }
-
-  /* Restaurar contexto (6 textareas) */
-  var dados=r.dados_contexto || {};
-  if(dados.textos){
-    document.querySelectorAll('#f1s4 textarea').forEach(function(t,i){ if(dados.textos[i]!=null) t.value=dados.textos[i]; });
-  } else if(r.contexto){
-    /* Fallback: texto único separado por \n\n */
-    var partes=r.contexto.split('\n\n');
-    document.querySelectorAll('#f1s4 textarea').forEach(function(t,i){ if(partes[i]) t.value=partes[i]; });
-  }
-
-  /* Restaurar expectativas (2 textareas) */
-  var dex=r.dados_expectativas || {};
-  if(dex.textos){
-    document.querySelectorAll('#f1s5 textarea').forEach(function(t,i){ if(dex.textos[i]!=null) t.value=dex.textos[i]; });
-  } else if(r.expectativas){
-    var partes=r.expectativas.split('\n\n');
-    document.querySelectorAll('#f1s5 textarea').forEach(function(t,i){ if(partes[i]) t.value=partes[i]; });
-    var q14=document.getElementById('q14-resp'); if(q14 && r.expectativas) q14.value=r.expectativas;
-  }
-
-  /* Restaurar temas (checkboxes .tema-cb) via dados_perfil */
-  var dp=r.dados_perfil || {};
-  if(dp.temas && Array.isArray(dp.temas)){
-    document.querySelectorAll('.tema-cb').forEach(function(cb){
-      var label=cb.closest('label');
-      var texto=(label ? label.textContent : cb.value || '').replace(/\s+/g,' ').trim();
-      dp.temas.forEach(function(t){ if(texto && texto.indexOf(t.substring(0,15))>=0) cb.checked=true; });
-    });
-  }
-
-  /* Restaurar barreiras (checkboxes .bar-cb) via dados_desafios */
-  var dd=r.dados_desafios || {};
-  if(dd.barreiras && Array.isArray(dd.barreiras)){
-    document.querySelectorAll('.bar-cb').forEach(function(cb){
-      var label=cb.closest('label');
-      var texto=(label ? label.textContent : cb.value || '').replace(/\s+/g,' ').trim();
-      dd.barreiras.forEach(function(b){ if(texto && texto.indexOf(b.substring(0,15))>=0) cb.checked=true; });
-    });
-  }
 }
 function coletarDadosFormulario(finalizado){
   var nome      = campoValor('#p-nome');
@@ -1808,38 +1732,11 @@ async function salvarRegistroSupabase(dados){
 }
 async function salvarFormularioSupabase(finalizado){
   var dados=coletarDadosFormulario(!!finalizado);
-  /* Se o email veio do _currentUser, já está em dados via coletarDadosFormulario */
   if(!dados.nome || !dados.inst || !dados.email){
     console.warn('Dados mínimos ausentes para salvar no Supabase:', dados);
-    if(!finalizado){
-      /* Feedback visual no botão salvar */
-      var btn=document.getElementById('f1-save');
-      if(btn){
-        var orig=btn.innerHTML;
-        btn.innerHTML='<i class="ti ti-alert-circle"></i> Preencha nome, inst. e e-mail';
-        btn.style.color='#E63329';
-        setTimeout(function(){btn.innerHTML=orig;btn.style.color='';},3000);
-      }
-    }
     return null;
   }
-  var result = await salvarRegistroSupabase(dados);
-  /* Feedback visual no botão salvar */
-  if(!finalizado){
-    var btn=document.getElementById('f1-save');
-    if(btn){
-      var orig=btn.innerHTML;
-      if(result){
-        btn.innerHTML='<i class="ti ti-circle-check"></i> Salvo!';
-        btn.style.color='#0F6E56';
-      } else {
-        btn.innerHTML='<i class="ti ti-alert-circle"></i> Erro ao salvar';
-        btn.style.color='#E63329';
-      }
-      setTimeout(function(){btn.innerHTML=orig;btn.style.color='';},2500);
-    }
-  }
-  return result;
+  return await salvarRegistroSupabase(dados);
 }
 /* Save inscrito to Supabase — compatibilidade com código legado */
 async function salvarInscritoSupabase(nome, inst, cargo, perfil, foto) {
@@ -3755,33 +3652,22 @@ async function submitAuth() {
     } else {
       var user = await supaGetUsuario(email);
       if (!user) { showAuthError('E-mail não encontrado. Faça seu cadastro.'); resetBtn(); return; }
-
-      /* Verificar senha — tenta hash SHA-256 primeiro, depois direto */
-      var senhaHash = await hashSenha(senha);
-      var senhaCorreta = false;
-      var senhaArmazenada = user.senha || '';
-      /* Comparar com hash */
-      if(senhaArmazenada && senhaArmazenada === senhaHash) senhaCorreta = true;
-      /* Comparar direto (para senhas antigas não hasheadas) */
-      if(!senhaCorreta && senhaArmazenada === senha) senhaCorreta = true;
-      if (!senhaCorreta) { showAuthError('Senha incorreta.'); resetBtn(); return; }
+      if ((user.senha || '') !== senha) { showAuthError('Senha incorreta.'); resetBtn(); return; }
 
       _currentUser = user;
       saveSession(user);
       resetBtn();
 
-      /* Carregar dados do formulário salvos no banco */
-      setTimeout(function() {
-        var nomeEl  = document.getElementById('p-nome');
-        var instEl  = document.getElementById('p-inst');
-        var emailEl = document.getElementById('p-email');
-        if (nomeEl)  nomeEl.value  = user.nome || '';
-        if (instEl)  instEl.value  = user.inst || user.orgao || '';
-        if (emailEl) emailEl.value = email;
-        if (typeof preencherFormularioComRegistro === 'function') preencherFormularioComRegistro(user);
-      }, 50);
-
       if (!user.inscrito) {
+        setTimeout(function() {
+          var nomeEl  = document.getElementById('p-nome');
+          var instEl  = document.getElementById('p-inst');
+          var emailEl = document.getElementById('p-email');
+          if (nomeEl)  nomeEl.value  = user.nome || '';
+          if (instEl)  instEl.value  = user.inst || user.orgao || '';
+          if (emailEl) emailEl.value = email;
+          if (typeof preencherFormularioComRegistro === 'function') preencherFormularioComRegistro(user);
+        }, 50);
         document.getElementById('auth-layer').classList.add('hidden');
         setTimeout(function() {
           var t1btn = document.querySelector('[data-tab="t1"]');
