@@ -536,6 +536,7 @@ html,body{height:100%;font-family:var(--font);background:#EEF2F9;color:var(--col
   <button class="tab" data-tab="t1" onclick="switchTab('t1',this)"><i class="ti ti-clipboard-list"></i><span> Inscrição</span></button>
   <button class="tab" data-tab="tr" onclick="switchTab('tr',this)"><i class="ti ti-users"></i><span> Participantes</span></button>
   <button class="tab" data-tab="td" onclick="switchTab('td',this)"><i class="ti ti-chart-bubble"></i><span> Painel</span></button>
+  <button class="tab" data-tab="tp" onclick="switchTab('tp',this)"><i class="ti ti-masks-theater"></i><span> Personas</span></button>
   <button class="tab" data-tab="t2" onclick="switchTab('t2',this)"><i class="ti ti-sitemap"></i><span> Orquestração</span></button>
   <button class="tab" data-tab="t3" onclick="switchTab('t3',this)"><i class="ti ti-certificate"></i><span> Compromisso</span></button>
   <button class="tab" data-tab="tm" onclick="switchTab('tm',this)"><i class="ti ti-presentation"></i><span> Espelho</span></button>
@@ -1518,6 +1519,39 @@ html,body{height:100%;font-family:var(--font);background:#EEF2F9;color:var(--col
   </div>
 </div>
 
+<div id="tp" class="pane">
+  <div class="sa" style="padding:0 0 16px">
+
+    <div class="dash-sec"><i class="ti ti-masks-theater"></i>Personas do ecossistema<span class="live-badge">● AO VIVO</span></div>
+    <div class="card" style="margin:0 12px 10px;padding:12px 14px">
+      <div style="font-size:11px;color:#8A9AB5;line-height:1.5">
+        Arquétipos gerados automaticamente a partir das respostas reais dos inscritos, agrupados por perfil declarado e refinados pelas respostas de contexto, motivação e necessidades. Metodologia híbrida: Goal-Directed Design (Cooper), Jobs To Be Done e Teoria de Ecossistemas de Inovação (Adner/Isenberg/Moore).
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:#DDE6F2;margin:0 12px 12px;border-radius:12px;overflow:hidden">
+      <div style="background:#fff;padding:12px 14px"><div id="tp-m-personas" style="font-size:26px;font-weight:600;color:#0C447C;line-height:1">0</div><div style="font-size:11px;color:#8A9AB5;margin-top:4px">personas identificadas</div></div>
+      <div style="background:#fff;padding:12px 14px"><div id="tp-m-cobertura" style="font-size:26px;font-weight:600;color:#0C447C;line-height:1">0%</div><div style="font-size:11px;color:#8A9AB5;margin-top:4px">inscritos com dados de contexto</div></div>
+    </div>
+
+    <div id="tp-personas-lista" style="margin:0 12px"></div>
+
+    <div class="dash-sec" style="margin-top:6px"><i class="ti ti-download"></i>Exportar personas</div>
+    <div class="card" style="margin:0 12px 16px;padding:14px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button onclick="exportarPersonasExcel()" style="flex:1;min-width:130px;display:flex;align-items:center;justify-content:center;gap:8px;background:#0F6E56;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">
+          <i class="ti ti-file-spreadsheet" style="font-size:16px"></i>Baixar Excel
+        </button>
+        <button onclick="exportarPersonasPDF()" style="flex:1;min-width:130px;display:flex;align-items:center;justify-content:center;gap:8px;background:#993C1D;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">
+          <i class="ti ti-file-type-pdf" style="font-size:16px"></i>Baixar PDF
+        </button>
+      </div>
+      <div id="tp-export-status" style="font-size:11px;color:#8A9AB5;margin-top:10px;text-align:center"></div>
+    </div>
+
+  </div>
+</div>
+
 </div>
 
 
@@ -1847,7 +1881,7 @@ async function carregarInscritosSupabase() {
       .order('created_at', { ascending: true });
     if (error) { console.warn('Supabase load error:', error.message); return; }
     _inscritosCompletos = data || [];
-    if (!data || !data.length) { _inscritos=[]; recomputarDashboardDosInscritos([]); if (typeof renderRanking === 'function') renderRanking(); if (typeof renderDashboard === 'function') renderDashboard(); return; }
+    if (!data || !data.length) { _inscritos=[]; recomputarDashboardDosInscritos([]); if (typeof renderRanking === 'function') renderRanking(); if (typeof renderDashboard === 'function') renderDashboard(); if (typeof renderPersonas === 'function') renderPersonas(); return; }
     _inscritos = data.filter(function(p){return !!p.nome;}).map(function(p) {
       return {
         id:p.id, email:p.email||'', nome: p.nome, inst: p.inst || p.orgao || '',
@@ -1858,6 +1892,7 @@ async function carregarInscritosSupabase() {
     recomputarDashboardDosInscritos(data);
     if (typeof renderRanking === 'function') renderRanking();
     if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderPersonas === 'function') renderPersonas();
     console.log('✅ Inscritos reais carregados do Supabase:', data.length);
   } catch(e) { console.warn('Supabase load error:', e); }
 }
@@ -1918,8 +1953,8 @@ function switchTab(id,btn){
   btn.classList.add('active');
   if(id==='t3') renderProposals();
   if(id==='tf') renderFac();
-  /* Painel: sempre buscar os dados mais recentes de todos os inscritos ao abrir a aba */
-  if(id==='td' && typeof carregarInscritosSupabase==='function') carregarInscritosSupabase();
+  /* Painel e Personas: sempre buscar os dados mais recentes de todos os inscritos ao abrir a aba */
+  if((id==='td'||id==='tp') && typeof carregarInscritosSupabase==='function') carregarInscritosSupabase();
   if((id==='tr'||id==='td') && typeof renderRanking==='function') renderRanking();
 }
 
@@ -3318,6 +3353,290 @@ async function exportarInscritosPDF(){
     doc.save('Relatorio_Inscritos_ConectarParaInovar_'+dataStr+'.pdf');
     _statusExport('PDF gerado com '+linhas.length+' inscritos.');
   }catch(e){ console.warn('Erro ao exportar PDF:',e); _statusExport('Erro ao gerar PDF. Tente novamente.', true); }
+}
+
+/* ════════════════════
+   PERSONAS — geração híbrida (Perfil + Contexto)
+   Metodologia: Goal-Directed Design (Cooper) + JTBD + Arquétipos de
+   Ecossistema (Adner/Isenberg/Moore), aplicada aos campos reais do
+   formulário (perfil, cargo, instituição, desafios, contribuição,
+   dados_contexto, dados_expectativas).
+   ════════════════════ */
+
+/* Mapeia o "Perfil" declarado para um polo do ecossistema (hélice) */
+function _poloEcossistema(perfilTxt, cargoTxt, instTxt){
+  var s=((perfilTxt||'')+' '+(cargoTxt||'')+' '+(instTxt||'')).toLowerCase();
+  if(/governo|p[uú]blic|secretaria|minist[ée]rio|prefeitura|c[aâ]mara|senado|c[aâ]mara dos deputados/.test(s)) return 'Governo e Gestão Pública';
+  if(/universidade|instituto federal|academia|pesquisa|professor|docente|p[oó]s-gradua|ifb|ufrj|unb/.test(s)) return 'Academia e Pesquisa';
+  if(/empresa|mercado|startup|neg[oó]cio|empreende|ind[uú]stria|com[eé]rcio/.test(s)) return 'Mercado e Empreendedorismo';
+  if(/fomento|financiamento|investidor|banco|capital|fundo|abdi|bndes/.test(s)) return 'Financiamento e Fomento';
+  if(/sociedade civil|ong|associa[çc][aã]o|comunidade|terceiro setor/.test(s)) return 'Sociedade Civil';
+  return 'Outros Atores do Ecossistema';
+}
+
+/* Gera um nome fictício estável a partir de uma seed (mesmo grupo => mesmo nome) */
+var _nomesFicticios=['Marina','Carlos','Beatriz','Rafael','Camila','André','Fernanda','Lucas','Patrícia','Eduardo','Juliana','Bruno','Renata','Felipe','Aline','Diego'];
+function _nomeFicticio(seed){
+  var idx=Math.abs(seed.split('').reduce(function(a,c){return a+c.charCodeAt(0);},0))%_nomesFicticios.length;
+  return _nomesFicticios[idx];
+}
+
+function _topTexto(lista, n){
+  var freq={};
+  lista.forEach(function(t){ if(t && t!=='—') freq[t]=(freq[t]||0)+1; });
+  var arr=Object.entries(freq).sort(function(a,b){return b[1]-a[1];});
+  return arr.slice(0, n||1).map(function(a){return a[0];});
+}
+
+function gerarPersonas(){
+  var registros=_inscritosCompletos||[];
+  var comDados=registros.filter(function(p){ return p && p.nome; });
+  if(!comDados.length) return {personas:[], cobertura:0};
+
+  function val(v){ if(v===null||v===undefined) return '—'; var s=String(v).trim(); return (s===''||s.toLowerCase()==='null') ? '—' : s; }
+
+  var comContexto=0;
+  var grupos={};
+  comDados.forEach(function(p){
+    var dc=p.dados_contexto||{};
+    var de=p.dados_expectativas||{};
+    var temContexto = dc && typeof dc==='object' && Object.keys(dc).length>0;
+    if(temContexto) comContexto++;
+
+    var polo=_poloEcossistema(p.perfil, p.cargo, p.inst||p.orgao);
+    if(!grupos[polo]) grupos[polo]=[];
+
+    grupos[polo].push({
+      nome:p.nome, cargo:val(p.cargo), inst:val(p.inst||p.orgao),
+      motivacao: val(dc['O que me motiva a continuar']),
+      barreira: val(dc['O que trava esse avanço']) !== '—' ? val(dc['O que trava esse avanço']) : val(p.desafios),
+      avanca: val(dc['O que estou tentando avançar']),
+      necessidade: val(dc['O que preciso desta oficina']),
+      contribuicao: val(p.contribuicao),
+      expectativa: val(de['Daqui a 1 ano, como você saberia que avançamos']),
+      valerOTempo: val(de['O que faria esta oficina valer o seu tempo']),
+      inferido: !temContexto
+    });
+  });
+
+  var personas=Object.keys(grupos).map(function(polo){
+    var membros=grupos[polo];
+    var nome=_nomeFicticio(polo);
+    var cargoRep=_topTexto(membros.map(function(m){return m.cargo;}),1)[0]||'Profissional do ecossistema';
+    var instRep=_topTexto(membros.map(function(m){return m.inst;}),1)[0]||'Instituição do ecossistema';
+
+    var motivacoes=_topTexto(membros.map(function(m){return m.motivacao;}),2);
+    var barreiras=_topTexto(membros.map(function(m){return m.barreira;}),2);
+    var avancos=_topTexto(membros.map(function(m){return m.avanca;}),2);
+    var necessidades=_topTexto(membros.map(function(m){return m.necessidade;}),2);
+    var contribuicoes=_topTexto(membros.map(function(m){return m.contribuicao;}),2);
+    var expectativas=_topTexto(membros.map(function(m){return m.expectativa;}),2);
+
+    var algumInferido=membros.some(function(m){return m.inferido;});
+    var qtdInferidos=membros.filter(function(m){return m.inferido;}).length;
+
+    function _ou(arr, fallbackInferido){
+      if(arr.length && arr[0]!=='—') return arr;
+      return fallbackInferido ? [fallbackInferido] : ['Não há dados suficientes coletados.'];
+    }
+
+    var motivacaoInferida='Espera-se motivação ligada a '+(/governo/i.test(polo)?'impacto e desenvolvimento regional':/academia/i.test(polo)?'transferência de conhecimento e projetos aplicados':/mercado/i.test(polo)?'crescimento e geração de oportunidades de negócio':/fomento/i.test(polo)?'retorno e escalabilidade de iniciativas apoiadas':'fortalecimento da atuação no ecossistema')+' (inferido a partir do cargo/instituição, sem resposta direta).';
+    var necessidadeInferida='Provável necessidade de '+(/governo/i.test(polo)?'articulação institucional e dados para tomada de decisão':/academia/i.test(polo)?'conexão com demandas reais e projetos aplicáveis':/mercado/i.test(polo)?'mercado, mentoria e conexões comerciais':/fomento/i.test(polo)?'pipeline de oportunidades qualificadas':'orientação e capacitação')+' (inferido).';
+
+    return {
+      polo: polo,
+      nomeFicticio: nome+' — '+polo,
+      qtdMembros: membros.length,
+      cargoRepresentativo: cargoRep,
+      instituicaoRepresentativa: instRep,
+      motivacoes: _ou(motivacoes, algumInferido ? motivacaoInferida : null),
+      barreiras: _ou(barreiras, null),
+      avancos: _ou(avancos, null),
+      necessidades: _ou(necessidades, algumInferido ? necessidadeInferida : null),
+      contribuicoes: _ou(contribuicoes, null),
+      expectativas: _ou(expectativas, null),
+      qtdInferidos: qtdInferidos,
+      membros: membros
+    };
+  }).sort(function(a,b){ return b.qtdMembros - a.qtdMembros; });
+
+  return { personas: personas, cobertura: Math.round(comContexto/comDados.length*100) };
+}
+
+var _poloIcones={
+  'Governo e Gestão Pública':'ti-building-bank',
+  'Academia e Pesquisa':'ti-school',
+  'Mercado e Empreendedorismo':'ti-rocket',
+  'Financiamento e Fomento':'ti-coin',
+  'Sociedade Civil':'ti-heart-handshake',
+  'Outros Atores do Ecossistema':'ti-users-group'
+};
+var _poloCores={
+  'Governo e Gestão Pública':'#0C447C',
+  'Academia e Pesquisa':'#534AB7',
+  'Mercado e Empreendedorismo':'#0F6E56',
+  'Financiamento e Fomento':'#BA7517',
+  'Sociedade Civil':'#993C1D',
+  'Outros Atores do Ecossistema':'#5570A0'
+};
+
+function _listaTags(arr, cor){
+  return arr.map(function(t){
+    return '<span style="display:inline-block;background:'+cor+'14;color:'+cor+';border:0.5px solid '+cor+'40;border-radius:8px;padding:5px 9px;font-size:11px;margin:3px 4px 3px 0;line-height:1.4">'+esc(t)+'</span>';
+  }).join('');
+}
+
+function renderPersonas(){
+  var lista=document.getElementById('tp-personas-lista');
+  var mP=document.getElementById('tp-m-personas');
+  var mC=document.getElementById('tp-m-cobertura');
+  if(!lista) return;
+
+  var resultado=gerarPersonas();
+  _personasGeradas=resultado.personas;
+
+  if(mP) mP.textContent=resultado.personas.length;
+  if(mC) mC.textContent=resultado.cobertura+'%';
+
+  if(!resultado.personas.length){
+    lista.innerHTML='<div class="card" style="padding:14px;font-size:11px;color:#8A9AB5;font-style:italic">Aguardando inscrições para gerar personas...</div>';
+    return;
+  }
+
+  lista.innerHTML=resultado.personas.map(function(p){
+    var cor=_poloCores[p.polo]||'#5570A0';
+    var icone=_poloIcones[p.polo]||'ti-user';
+    var avisoInferencia = p.qtdInferidos>0
+      ? '<div style="font-size:10px;color:#BA7517;background:#FFF8EC;border:0.5px solid #F0DCA8;border-radius:8px;padding:5px 8px;margin-top:8px"><i class="ti ti-info-circle"></i> '+p.qtdInferidos+' de '+p.qtdMembros+' inscrito(s) deste grupo não respondeu ao bloco de contexto; parte desta persona foi inferida a partir de cargo/instituição.</div>'
+      : '';
+    return ''
+      +'<div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">'
+        +'<div style="background:'+cor+';color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px">'
+          +'<i class="ti '+icone+'" style="font-size:22px"></i>'
+          +'<div style="flex:1">'
+            +'<div style="font-size:15px;font-weight:700">'+esc(p.nomeFicticio)+'</div>'
+            +'<div style="font-size:11px;opacity:.85">'+esc(p.cargoRepresentativo)+' · '+esc(p.instituicaoRepresentativa)+'</div>'
+          +'</div>'
+          +'<div style="background:rgba(255,255,255,.22);border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;white-space:nowrap">'+p.qtdMembros+' pessoa'+(p.qtdMembros>1?'s':'')+'</div>'
+        +'</div>'
+        +'<div style="padding:14px 16px">'
+          +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8A9AB5;margin-bottom:5px"><i class="ti ti-flag" style="color:'+cor+'"></i> O que está tentando avançar</div>'
+          +'<div style="margin-bottom:10px">'+_listaTags(p.avancos,cor)+'</div>'
+
+          +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8A9AB5;margin-bottom:5px"><i class="ti ti-bolt" style="color:'+cor+'"></i> Motivação</div>'
+          +'<div style="margin-bottom:10px">'+_listaTags(p.motivacoes,cor)+'</div>'
+
+          +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8A9AB5;margin-bottom:5px"><i class="ti ti-barrier-block" style="color:'+cor+'"></i> Barreira / desafio dominante</div>'
+          +'<div style="margin-bottom:10px">'+_listaTags(p.barreiras,cor)+'</div>'
+
+          +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8A9AB5;margin-bottom:5px"><i class="ti ti-target-arrow" style="color:'+cor+'"></i> Necessidade na oficina (JTBD)</div>'
+          +'<div style="margin-bottom:10px">'+_listaTags(p.necessidades,cor)+'</div>'
+
+          +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8A9AB5;margin-bottom:5px"><i class="ti ti-gift" style="color:'+cor+'"></i> O que contribui ao ecossistema</div>'
+          +'<div style="margin-bottom:10px">'+_listaTags(p.contribuicoes,cor)+'</div>'
+
+          +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8A9AB5;margin-bottom:5px"><i class="ti ti-confetti" style="color:'+cor+'"></i> Como saberia que avançou em 1 ano</div>'
+          +'<div>'+_listaTags(p.expectativas,cor)+'</div>'
+
+          +avisoInferencia
+        +'</div>'
+      +'</div>';
+  }).join('');
+}
+var _personasGeradas=[];
+
+function _statusExportPersonas(msg, isErro){
+  var el=document.getElementById('tp-export-status');
+  if(el){ el.textContent=msg; el.style.color = isErro ? '#993C1D' : '#8A9AB5'; }
+}
+
+async function exportarPersonasExcel(){
+  try{
+    if(typeof XLSX==='undefined'){ _statusExportPersonas('Biblioteca de Excel não carregou. Verifique sua conexão.', true); return; }
+    if(!_personasGeradas.length) renderPersonas();
+    if(!_personasGeradas.length){ _statusExportPersonas('Nenhuma persona gerada ainda.', true); return; }
+    _statusExportPersonas('Gerando Excel...');
+    var linhas=_personasGeradas.map(function(p,i){
+      return {
+        'Nº':i+1,
+        'Persona':p.nomeFicticio,
+        'Polo do Ecossistema':p.polo,
+        'Qtde de Inscritos no Grupo':p.qtdMembros,
+        'Cargo Representativo':p.cargoRepresentativo,
+        'Instituição Representativa':p.instituicaoRepresentativa,
+        'O que Avança':p.avancos.join(' | '),
+        'Motivação':p.motivacoes.join(' | '),
+        'Barreira Dominante':p.barreiras.join(' | '),
+        'Necessidade (JTBD)':p.necessidades.join(' | '),
+        'Contribuição ao Ecossistema':p.contribuicoes.join(' | '),
+        'Expectativa em 1 Ano':p.expectativas.join(' | '),
+        'Dados Inferidos (sem resposta direta)':p.qtdInferidos+' de '+p.qtdMembros
+      };
+    });
+    var ws=XLSX.utils.json_to_sheet(linhas);
+    ws['!cols']=[{wch:5},{wch:30},{wch:26},{wch:12},{wch:26},{wch:30},{wch:34},{wch:34},{wch:34},{wch:34},{wch:34},{wch:34},{wch:18}];
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Personas');
+    var dataStr=new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb,'Personas_ConectarParaInovar_'+dataStr+'.xlsx');
+    _statusExportPersonas('Excel gerado com '+linhas.length+' personas.');
+  }catch(e){ console.warn('Erro ao exportar personas (Excel):',e); _statusExportPersonas('Erro ao gerar Excel. Tente novamente.', true); }
+}
+
+async function exportarPersonasPDF(){
+  try{
+    if(typeof window.jspdf==='undefined'){ _statusExportPersonas('Biblioteca de PDF não carregou. Verifique sua conexão.', true); return; }
+    if(!_personasGeradas.length) renderPersonas();
+    if(!_personasGeradas.length){ _statusExportPersonas('Nenhuma persona gerada ainda.', true); return; }
+    _statusExportPersonas('Gerando PDF...');
+    var doc=new window.jspdf.jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
+    var dataGeracao=new Date().toLocaleString('pt-BR');
+    var pageW=doc.internal.pageSize.getWidth();
+    var y=40;
+    doc.setFontSize(16); doc.setTextColor(26,107,60);
+    doc.text('ENEDES — Personas do Ecossistema', 40, y); y+=18;
+    doc.setFontSize(9); doc.setTextColor(64,64,64);
+    doc.text('Conectar para Inovar · Gerado em '+dataGeracao, 40, y); y+=22;
+
+    _personasGeradas.forEach(function(p, idx){
+      if(y>700){ doc.addPage(); y=40; }
+      doc.setFillColor(245,247,251);
+      doc.setDrawColor(220,228,242);
+      doc.roundedRect(40,y,pageW-80,22,4,4,'F');
+      doc.setFontSize(12); doc.setTextColor(26,107,60);
+      doc.text(p.nomeFicticio+'  ('+p.qtdMembros+' pessoa'+(p.qtdMembros>1?'s':'')+')', 48, y+15);
+      y+=30;
+      doc.setFontSize(9); doc.setTextColor(64,64,64);
+      var blocos=[
+        ['Cargo / Instituição representativa', p.cargoRepresentativo+' — '+p.instituicaoRepresentativa],
+        ['O que está tentando avançar', p.avancos.join(' | ')],
+        ['Motivação', p.motivacoes.join(' | ')],
+        ['Barreira dominante', p.barreiras.join(' | ')],
+        ['Necessidade na oficina (JTBD)', p.necessidades.join(' | ')],
+        ['Contribuição ao ecossistema', p.contribuicoes.join(' | ')],
+        ['Expectativa em 1 ano', p.expectativas.join(' | ')]
+      ];
+      blocos.forEach(function(b){
+        doc.setFont(undefined,'bold'); doc.setFontSize(8.5); doc.setTextColor(120,120,120);
+        doc.text(b[0].toUpperCase(), 40, y); y+=11;
+        doc.setFont(undefined,'normal'); doc.setFontSize(9.5); doc.setTextColor(40,40,40);
+        var linhasTxt=doc.splitTextToSize(b[1]||'—', pageW-90);
+        doc.text(linhasTxt, 40, y);
+        y+=linhasTxt.length*11+6;
+        if(y>740){ doc.addPage(); y=40; }
+      });
+      if(p.qtdInferidos>0){
+        doc.setFontSize(8); doc.setTextColor(186,117,23);
+        var avisoLinhas=doc.splitTextToSize(p.qtdInferidos+' de '+p.qtdMembros+' inscrito(s) sem resposta de contexto; parte da persona foi inferida a partir de cargo/instituição.', pageW-90);
+        doc.text(avisoLinhas, 40, y); y+=avisoLinhas.length*10;
+      }
+      y+=14;
+    });
+
+    var dataStr=new Date().toISOString().slice(0,10);
+    doc.save('Personas_ConectarParaInovar_'+dataStr+'.pdf');
+    _statusExportPersonas('PDF gerado com '+_personasGeradas.length+' personas.');
+  }catch(e){ console.warn('Erro ao exportar personas (PDF):',e); _statusExportPersonas('Erro ao gerar PDF. Tente novamente.', true); }
 }
 
 /* ════════════════════
