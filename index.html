@@ -537,6 +537,7 @@ html,body{height:100%;font-family:var(--font);background:#EEF2F9;color:var(--col
   <button class="tab" data-tab="tr" onclick="switchTab('tr',this)"><i class="ti ti-users"></i><span> Participantes</span></button>
   <button class="tab" data-tab="td" onclick="switchTab('td',this)"><i class="ti ti-chart-bubble"></i><span> Painel</span></button>
   <button class="tab" data-tab="tp" onclick="switchTab('tp',this)"><i class="ti ti-masks-theater"></i><span> Personas</span></button>
+  <button class="tab" data-tab="tmet" onclick="switchTab('tmet',this)"><i class="ti ti-book"></i><span> Metodologia</span></button>
   <button class="tab" data-tab="t2" onclick="switchTab('t2',this)"><i class="ti ti-sitemap"></i><span> Orquestração</span></button>
   <button class="tab" data-tab="t3" onclick="switchTab('t3',this)"><i class="ti ti-certificate"></i><span> Compromisso</span></button>
   <button class="tab" data-tab="tm" onclick="switchTab('tm',this)"><i class="ti ti-presentation"></i><span> Espelho</span></button>
@@ -1552,6 +1553,79 @@ html,body{height:100%;font-family:var(--font);background:#EEF2F9;color:var(--col
   </div>
 </div>
 
+<div id="tmet" class="pane">
+  <div class="sa" style="padding:0 0 16px">
+
+    <div class="dash-sec"><i class="ti ti-book"></i>Base teórica do modelo de personas</div>
+    <div class="card" style="margin:0 12px 10px;padding:14px 16px">
+      <div style="font-size:12px;color:#3A4A66;line-height:1.6">
+        O modelo tradicional de persona de marketing (idade, renda, profissão) é insuficiente para um ecossistema de inovação, onde convivem empreendedores, startups, investidores, pesquisadores, gestores públicos e empresas com lógicas muito diferentes entre si. Por isso, a ENEDES utiliza um modelo <b>híbrido</b>, combinando referenciais de Design Thinking, Comportamento do Consumidor e Teoria dos Ecossistemas de Inovação.
+      </div>
+    </div>
+
+    <div class="dash-sec"><i class="ti ti-stack-2"></i>Os 3 referenciais combinados</div>
+
+    <div class="card" style="margin:0 12px 10px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <i class="ti ti-user-circle" style="font-size:18px;color:#0C447C"></i>
+        <div style="font-size:13px;font-weight:700;color:#1A2E4A">1. Goal-Directed Design — Alan Cooper</div>
+      </div>
+      <div style="font-size:11.5px;color:#5570A0;line-height:1.6">
+        Modelo clássico de construção de personas: <i>quem é, objetivos, motivações, comportamentos, necessidades, frustrações, contexto de uso, jornada.</i> No formulário, isso corresponde aos campos de <b>identificação</b> (nome, cargo, instituição) e ao bloco de <b>contexto</b> (motivação, o que trava o avanço).
+      </div>
+    </div>
+
+    <div class="card" style="margin:0 12px 10px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <i class="ti ti-target-arrow" style="font-size:18px;color:#0F6E56"></i>
+        <div style="font-size:13px;font-weight:700;color:#1A2E4A">2. Jobs To Be Done — Clayton Christensen</div>
+      </div>
+      <div style="font-size:11.5px;color:#5570A0;line-height:1.6">
+        Parte do princípio de que "as pessoas não compram produtos, contratam soluções para resolver problemas". A persona deixa de ser uma descrição demográfica e passa a ser um <b>trabalho a ser feito</b> (funcional, emocional e social). No formulário, corresponde a <b>"O que preciso desta oficina"</b> e <b>"Desafios"</b> — a necessidade real, não o rótulo da pessoa.
+      </div>
+    </div>
+
+    <div class="card" style="margin:0 12px 10px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <i class="ti ti-sitemap" style="font-size:18px;color:#534AB7"></i>
+        <div style="font-size:13px;font-weight:700;color:#1A2E4A">3. Arquétipos de Ecossistema — Adner, Isenberg, Moore</div>
+      </div>
+      <div style="font-size:11.5px;color:#5570A0;line-height:1.6">
+        Em vez de criar personas puramente individuais, esta abordagem cria <b>arquétipos dos atores do ecossistema</b> (Empreendedor, Investidor, Universidade, Governo, Empresa), cada um com sua motivação e necessidade típica. É a abordagem mais estratégica para a ENEDES porque permite mapear as <b>relações entre atores</b>, não apenas indivíduos isolados. No formulário, corresponde ao campo <b>Perfil</b> (o polo do ecossistema) cruzado com <b>Contribuição</b> e <b>Expectativa em 1 ano</b>.
+      </div>
+    </div>
+
+    <div class="dash-sec"><i class="ti ti-list-check"></i>Como cada campo do formulário alimenta a persona</div>
+    <div class="card" style="margin:0 12px 10px;padding:0;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="background:#F2F5FA"><th style="text-align:left;padding:8px 12px;color:#5570A0;font-weight:700">Dimensão da persona</th><th style="text-align:left;padding:8px 12px;color:#5570A0;font-weight:700">Campo de origem</th></tr>
+        <tr style="border-top:0.5px solid #EEF2F9"><td style="padding:8px 12px;color:#3A4A66">Polo do ecossistema</td><td style="padding:8px 12px;color:#5570A0">Perfil + Cargo + Instituição</td></tr>
+        <tr style="border-top:0.5px solid #EEF2F9;background:#FAFBFD"><td style="padding:8px 12px;color:#3A4A66">O que está tentando avançar</td><td style="padding:8px 12px;color:#5570A0">Contexto — "O que estou tentando avançar"</td></tr>
+        <tr style="border-top:0.5px solid #EEF2F9"><td style="padding:8px 12px;color:#3A4A66">Motivação</td><td style="padding:8px 12px;color:#5570A0">Contexto — "O que me motiva a continuar"</td></tr>
+        <tr style="border-top:0.5px solid #EEF2F9;background:#FAFBFD"><td style="padding:8px 12px;color:#3A4A66">Barreira dominante</td><td style="padding:8px 12px;color:#5570A0">Contexto — "O que trava esse avanço" + Desafios</td></tr>
+        <tr style="border-top:0.5px solid #EEF2F9"><td style="padding:8px 12px;color:#3A4A66">Necessidade (JTBD)</td><td style="padding:8px 12px;color:#5570A0">Contexto — "O que preciso desta oficina"</td></tr>
+        <tr style="border-top:0.5px solid #EEF2F9;background:#FAFBFD"><td style="padding:8px 12px;color:#3A4A66">Contribuição ao ecossistema</td><td style="padding:8px 12px;color:#5570A0">Contribuição</td></tr>
+        <tr style="border-top:0.5px solid #EEF2F9"><td style="padding:8px 12px;color:#3A4A66">Expectativa de sucesso</td><td style="padding:8px 12px;color:#5570A0">Expectativas — "Daqui a 1 ano..."</td></tr>
+      </table>
+    </div>
+
+    <div class="dash-sec"><i class="ti ti-git-merge"></i>Lógica de agrupamento (híbrida)</div>
+    <div class="card" style="margin:0 12px 10px;padding:14px 16px">
+      <div style="font-size:11.5px;color:#5570A0;line-height:1.7">
+        1. Cada inscrito é classificado em um <b>polo do ecossistema</b> (Governo, Academia, Mercado, Financiamento/Fomento, Sociedade Civil) a partir do campo Perfil, cruzado com Cargo e Instituição.<br><br>
+        2. Dentro de cada polo, as respostas de contexto, motivação e necessidade são agrupadas por frequência, gerando os atributos mais representativos daquele grupo — não uma média genérica, mas os <b>padrões reais mais citados</b>.<br><br>
+        3. Quando um inscrito não respondeu ao bloco de contexto, a persona à qual ele pertence é marcada com um aviso de <b>inferência</b>: parte da descrição é estimada a partir do cargo/instituição típicos daquele polo, em vez de inventada sem critério. Isso é sempre sinalizado visualmente — nenhuma informação inferida é apresentada como dado coletado.
+      </div>
+    </div>
+
+    <div class="dash-sec"><i class="ti ti-alert-triangle"></i>Limites do modelo</div>
+    <div class="card" style="margin:0 12px 16px;padding:14px 16px">
+      <div style="font-size:11.5px;color:#5570A0;line-height:1.7">
+        Personas geradas a partir de poucos respondentes (1 a 2 pessoas por grupo) têm baixa robustez estatística — funcionam mais como <b>hipóteses de trabalho</b> para a facilitação da oficina do que como retrato definitivo de um segmento. A robustez aumenta conforme mais inscrições completas chegam. Os avatares exibidos são ilustrações geradas (iniciais + cor do polo), não fotos ou representações de pessoas reais.
+      </div>
+    </div>
+
+  </div>
 </div>
 
 
@@ -3479,6 +3553,38 @@ var _poloCores={
   'Sociedade Civil':'#993C1D',
   'Outros Atores do Ecossistema':'#5570A0'
 };
+/* Símbolo simples em SVG por polo (sem dependência externa, formas geométricas) */
+var _poloSimbolos={
+  'Governo e Gestão Pública':'<path d="M16 6 L26 13 H6 Z" fill="rgba(255,255,255,.9)"/><rect x="9" y="14" width="3.5" height="13" fill="rgba(255,255,255,.9)"/><rect x="19.5" y="14" width="3.5" height="13" fill="rgba(255,255,255,.9)"/><rect x="14.3" y="14" width="3.5" height="13" fill="rgba(255,255,255,.9)"/><rect x="6" y="28" width="20" height="2.5" fill="rgba(255,255,255,.9)"/>',
+  'Academia e Pesquisa':'<path d="M16 7 L29 13 L16 19 L3 13 Z" fill="rgba(255,255,255,.9)"/><path d="M9 16.5 V23 C9 25 22.5 25 23 23 V16.5" stroke="rgba(255,255,255,.9)" stroke-width="1.8" fill="none"/><line x1="29" y1="13" x2="29" y2="21" stroke="rgba(255,255,255,.9)" stroke-width="1.6"/>',
+  'Mercado e Empreendedorismo':'<path d="M16 5 C20 9 22 14 20 19 C19.3 20.8 17.6 22 16 22 C14.4 22 12.7 20.8 12 19 C10 14 12 9 16 5 Z" fill="rgba(255,255,255,.9)"/><path d="M12 19 L8 26 L13 24 Z" fill="rgba(255,255,255,.75)"/><path d="M20 19 L24 26 L19 24 Z" fill="rgba(255,255,255,.75)"/><circle cx="16" cy="13" r="2.4" fill="#fff" opacity=".5"/>',
+  'Financiamento e Fomento':'<circle cx="16" cy="16" r="11" fill="rgba(255,255,255,.92)"/><text x="16" y="21" font-size="13" font-weight="700" text-anchor="middle" fill="currentColor">$</text>',
+  'Sociedade Civil':'<path d="M16 26 C16 26 6 19.5 6 13 C6 9.5 8.7 7 11.8 7 C13.6 7 15.1 7.9 16 9.2 C16.9 7.9 18.4 7 20.2 7 C23.3 7 26 9.5 26 13 C26 19.5 16 26 16 26 Z" fill="rgba(255,255,255,.9)"/>',
+  'Outros Atores do Ecossistema':'<circle cx="11" cy="13" r="4" fill="rgba(255,255,255,.9)"/><circle cx="21" cy="13" r="4" fill="rgba(255,255,255,.7)"/><path d="M4 25 C4 19 8 17 11 17 C14 17 18 19 18 25" stroke="rgba(255,255,255,.9)" stroke-width="0" fill="rgba(255,255,255,.55)"/><path d="M14 25 C14 19 18 17 21 17 C24 17 28 19 28 25" fill="rgba(255,255,255,.85)"/>'
+};
+function _inicialPersona(nomeFicticio){
+  var nome=(nomeFicticio||'').split('—')[0].trim();
+  return nome ? nome.charAt(0).toUpperCase() : '?';
+}
+/* Gera um avatar SVG ilustrativo: gradiente na cor do polo + símbolo do setor + inicial.
+   Não representa pessoa real — é uma ilustração de arquétipo. */
+function _avatarPersonaSVG(polo, nomeFicticio, tamanho){
+  tamanho = tamanho || 56;
+  var cor=_poloCores[polo]||'#5570A0';
+  var simbolo=_poloSimbolos[polo]||'';
+  var inicial=_inicialPersona(nomeFicticio);
+  var gradId='gradAv'+Math.abs((polo||'').split('').reduce(function(a,c){return a+c.charCodeAt(0);},0));
+  return '<svg width="'+tamanho+'" height="'+tamanho+'" viewBox="0 0 32 32" style="border-radius:50%;flex-shrink:0;display:block">'
+    +'<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="32" y2="32">'
+      +'<stop offset="0" stop-color="'+cor+'" stop-opacity=".55"/>'
+      +'<stop offset="1" stop-color="'+cor+'"/>'
+    +'</linearGradient></defs>'
+    +'<circle cx="16" cy="16" r="16" fill="url(#'+gradId+')"/>'
+    +'<g style="color:'+cor+'">'+simbolo+'</g>'
+    +'<circle cx="25" cy="25" r="6.2" fill="#fff"/>'
+    +'<text x="25" y="28.2" font-size="8" font-weight="700" text-anchor="middle" fill="'+cor+'" font-family="DM Sans,system-ui,sans-serif">'+inicial+'</text>'
+  +'</svg>';
+}
 
 function _listaTags(arr, cor){
   return arr.map(function(t){
@@ -3511,8 +3617,8 @@ function renderPersonas(){
       : '';
     return ''
       +'<div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">'
-        +'<div style="background:'+cor+';color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px">'
-          +'<i class="ti '+icone+'" style="font-size:22px"></i>'
+        +'<div style="background:'+cor+';color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px">'
+          +_avatarPersonaSVG(p.polo, p.nomeFicticio, 52)
           +'<div style="flex:1">'
             +'<div style="font-size:15px;font-weight:700">'+esc(p.nomeFicticio)+'</div>'
             +'<div style="font-size:11px;opacity:.85">'+esc(p.cargoRepresentativo)+' · '+esc(p.instituicaoRepresentativa)+'</div>'
@@ -4526,7 +4632,7 @@ function renderRanking(){
 
 /* ── Lock system (restored) ── */
 var SENHA_FAC='conectar2026';
-var TABS_RESTR=['t2','t3','tm','tf'];
+var TABS_RESTR=['t2','t3','tm','tf','tp','tmet'];
 var _facAtivo=false;
 
 function getTabBtn(id){ return document.querySelector('[data-tab="'+id+'"]'); }
