@@ -1945,21 +1945,42 @@ function recomputarDashboardDosInscritos(registros){
   (registros||[]).forEach(aplicarRegistroAoDashboard);
 }
 var _inscritosCompletos = [];
-/* Load inscritos from Supabase */
-async function carregarInscritosSupabase() {
+var _ultimoCarregamentoTs = 0;
+var _carregandoInscritos = false;
+var _fotosCache = {}; // id -> foto_base64, buscado sob demanda (evita Egress alto)
+var _fotosCacheTs = 0;
+
+/* Colunas leves: tudo exceto foto_base64 (que pode pesar centenas de KB por
+   pessoa). Isso reduz drasticamente o Egress, já que painel/personas/relatórios
+   não precisam da imagem. A foto é buscada à parte, só quando o Ranking
+   realmente precisa exibir avatares (ver buscarFotosInscritos). */
+var COLUNAS_LEVES = 'id,nome,inst,orgao,cargo,email,telefone,perfil,contribuicao,desafios,'
+  + 'presenca_confirmada,formpreenchido,dados_contexto,dados_expectativas,'
+  + 'created_at,updated_at,ultimo_acesso';
+
+/* Load inscritos from Supabase.
+   forcar=true ignora o cache de curto prazo (usado por ações explícitas do usuário,
+   como clicar em "Baixar Excel"). Sem forcar, chamadas muito próximas (<15s) são
+   ignoradas para não duplicar leituras ao trocar de aba rapidamente. */
+async function carregarInscritosSupabase(forcar) {
   const sb = getSupabase();
   if (!sb) return;
+  var agora = Date.now();
+  if (!forcar && _carregandoInscritos) return;
+  if (!forcar && (agora - _ultimoCarregamentoTs) < 15000 && _inscritosCompletos.length) return;
+  _carregandoInscritos = true;
   try {
     const { data, error } = await sb.from('inscritos')
-      .select('*')
+      .select(COLUNAS_LEVES)
       .order('created_at', { ascending: true });
+    _ultimoCarregamentoTs = Date.now();
     if (error) { console.warn('Supabase load error:', error.message); return; }
     _inscritosCompletos = data || [];
     if (!data || !data.length) { _inscritos=[]; recomputarDashboardDosInscritos([]); if (typeof renderRanking === 'function') renderRanking(); if (typeof renderDashboard === 'function') renderDashboard(); if (typeof renderPersonas === 'function') renderPersonas(); return; }
     _inscritos = data.filter(function(p){return !!p.nome;}).map(function(p) {
       return {
         id:p.id, email:p.email||'', nome: p.nome, inst: p.inst || p.orgao || '',
-        cargo: p.cargo || '', perfil: p.perfil || '', foto: p.foto_base64 || p.foto_url || null,
+        cargo: p.cargo || '', perfil: p.perfil || '', foto: _fotosCache[p.id] || null,
         presente: !!p.presenca_confirmada, novo:false
       };
     });
@@ -1968,8 +1989,34 @@ async function carregarInscritosSupabase() {
     if (typeof renderDashboard === 'function') renderDashboard();
     if (typeof renderPersonas === 'function') renderPersonas();
     console.log('✅ Inscritos reais carregados do Supabase:', data.length);
+    /* Busca fotos separadamente, sem bloquear a renderização principal */
+    buscarFotosInscritos();
   } catch(e) { console.warn('Supabase load error:', e); }
+  finally { _carregandoInscritos = false; }
 }
+
+/* Busca foto_base64 apenas dos inscritos ainda não cacheados, e só quando a
+   aba Ranking está visível (onde a foto realmente aparece). Mantém cache em
+   memória por sessão para não repetir a busca a cada poll. */
+async function buscarFotosInscritos(){
+  var abaAtiva=document.querySelector('.tab.active');
+  var onclickAttr = abaAtiva ? (abaAtiva.getAttribute('onclick')||'') : '';
+  var rankingVisivel = onclickAttr.indexOf("'tr'") > -1;
+  if(!rankingVisivel) return; // evita gastar Egress com foto se ninguém está vendo o ranking
+
+  var sb=getSupabase();
+  if(!sb) return;
+  var idsFaltando=(_inscritosCompletos||[]).map(function(p){return p.id;}).filter(function(id){ return !(id in _fotosCache); });
+  if(!idsFaltando.length) return;
+  try{
+    const { data, error } = await sb.from('inscritos').select('id,foto_base64').in('id', idsFaltando);
+    if(error){ console.warn('Erro ao buscar fotos:', error.message); return; }
+    (data||[]).forEach(function(r){ _fotosCache[r.id] = r.foto_base64 || null; });
+    _inscritos.forEach(function(p){ if(p.id in _fotosCache) p.foto = _fotosCache[p.id]; });
+    if (typeof renderRanking === 'function') renderRanking();
+  }catch(e){ console.warn('Erro ao buscar fotos:', e); }
+}
+
 /* Realtime subscription */
 function assinarRealtimeInscritos() {
   const sb = getSupabase();
@@ -3812,7 +3859,7 @@ window.addEventListener('DOMContentLoaded', function() {
   /* Load participants from Supabase */
   if(typeof carregarInscritosSupabase==='function') carregarInscritosSupabase();
   if(typeof assinarRealtimeInscritos==='function') assinarRealtimeInscritos();
-  if(typeof iniciarPollingInscritos==='function') iniciarPollingInscritos(30000);
+  if(typeof iniciarPollingInscritos==='function') iniciarPollingInscritos(180000); /* 3 min — Realtime já cobre updates instantâneos; isto é só rede de segurança */
   carregarEstado().then(function(ok) {
     if (ok) {
       renderFac && renderFac();
