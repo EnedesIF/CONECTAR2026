@@ -3280,7 +3280,7 @@ function renderDashboard(){
       var pct=Math.round(t[1]/maxT*100);
       return '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:0.5px solid #EEF2F9">'
         +'<div style="font-size:11px;color:#5570A0;width:170px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(t[0])+'">'+esc(t[0])+'</div>'
-        +'<div style="flex:1;height:7px;background:#EEF2F9;border-radius:4px;overflow:hidden"><div style="height:100%;border-radius:4px;background:'+tBlues[i]+'%;transition:width .7s cubic-bezier(.4,0,.2,1);width:'+pct+'%"></div></div>'
+        +'<div style="flex:1;height:7px;background:#EEF2F9;border-radius:4px;overflow:hidden"><div style="height:100%;border-radius:4px;background:'+tBlues[i]+';transition:width .7s cubic-bezier(.4,0,.2,1);width:'+pct+'%"></div></div>'
         +'<div style="font-size:11px;font-weight:600;color:#5570A0;width:24px;text-align:right">'+t[1]+'</div>'
         +'</div>';
     }).join('').replace(/<div style="[^"]*border-bottom[^"]*">([^]*)<\/div>\s*$/, function(m){ return m.replace('border-bottom:0.5px solid #EEF2F9',''); });
