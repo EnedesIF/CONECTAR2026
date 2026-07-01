@@ -548,6 +548,16 @@ html,body{height:100%;font-family:var(--font);background:#EEF2F9;color:var(--col
 
 <!-- ETAPA 1 -->
 <div id="t1" class="pane">
+  <div id="f1-encerrado" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:14px;text-align:center;flex:1">
+    <div style="width:56px;height:56px;border-radius:50%;background:rgba(153,60,29,.12);display:flex;align-items:center;justify-content:center">
+      <i class="ti ti-lock" style="font-size:28px;color:#993C1D"></i>
+    </div>
+    <h3 style="margin:0;color:#1A2E4A">Inscrições encerradas</h3>
+    <p style="margin:0;font-size:13px;color:var(--color-text-secondary,#5570A0);line-height:1.6;max-width:420px">
+      O período de inscrições para esta atividade foi encerrado e não estamos mais aceitando novos cadastros.
+      Se você já se inscreveu, acesse sua área de participante pelo menu.
+    </p>
+  </div>
   <div class="stepper" id="s1-stepper">
     <span class="sp active" onclick="goStep1(0)">Identificação</span><div class="ss"></div>
     <span class="sp" onclick="goStep1(1)">Perfil</span><div class="ss"></div>
@@ -4677,6 +4687,45 @@ function renderRanking(){
     if(p.novo){setTimeout(function(){card.classList.remove('av-new');},3000);}
   });
 }
+
+/* ── Controle de inscrições ── */
+var INSCRICOES_ABERTAS = false; /* mude para true para reabrir as inscrições */
+
+function aplicarStatusInscricoes(){
+  if(INSCRICOES_ABERTAS) return;
+  var area=document.getElementById('f1-area');
+  var nav=document.getElementById('f1-nav');
+  var stepper=document.getElementById('s1-stepper');
+  var prog=document.querySelector('#t1 .step-prog');
+  var fechado=document.getElementById('f1-encerrado');
+  if(area) area.style.display='none';
+  if(nav) nav.style.display='none';
+  if(stepper) stepper.style.display='none';
+  if(prog) prog.style.display='none';
+  if(fechado) fechado.style.display='flex';
+}
+document.addEventListener('DOMContentLoaded', aplicarStatusInscricoes);
+if(document.readyState!=='loading') aplicarStatusInscricoes();
+
+/* Bloqueio real do envio, independente da interface */
+var _origSubmitForm1 = typeof submitForm1==='function' ? submitForm1 : null;
+submitForm1 = async function(){
+  if(!INSCRICOES_ABERTAS){
+    alert('As inscrições estão encerradas. Não é possível enviar novos cadastros.');
+    aplicarStatusInscricoes();
+    return;
+  }
+  if(_origSubmitForm1) return _origSubmitForm1.apply(this, arguments);
+};
+var _origStepNav1 = typeof stepNav1==='function' ? stepNav1 : null;
+stepNav1 = async function(d){
+  if(!INSCRICOES_ABERTAS){
+    alert('As inscrições estão encerradas. Não é possível enviar novos cadastros.');
+    aplicarStatusInscricoes();
+    return;
+  }
+  if(_origStepNav1) return _origStepNav1.apply(this, arguments);
+};
 
 /* ── Lock system (restored) ── */
 var SENHA_FAC='conectar2026';
