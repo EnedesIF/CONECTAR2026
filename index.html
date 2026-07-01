@@ -4691,6 +4691,14 @@ function renderRanking(){
 /* ── Controle de inscrições ── */
 var INSCRICOES_ABERTAS = false; /* mude para true para reabrir as inscrições */
 
+/* Cadastros já existentes (usuário logado ou com sessão salva) continuam com
+   acesso ao formulário — o bloqueio vale apenas para NOVOS cadastros. */
+function usuarioExistenteLogado(){
+  try{ if(_currentUser && _currentUser.email) return true; }catch(e){}
+  try{ var s = (typeof getSession==='function') ? getSession() : null; if(s && s.email) return true; }catch(e){}
+  return false;
+}
+
 function aplicarStatusInscricoes(){
   if(INSCRICOES_ABERTAS) return;
 
@@ -4703,17 +4711,19 @@ function aplicarStatusInscricoes(){
     btnInscrever.style.cssText+='opacity:.55;cursor:not-allowed;filter:grayscale(.4);pointer-events:none;';
   }
 
-  /* 2. Formulário de inscrição (aba t1), caso alguém já esteja logado */
+  /* 2. Formulário de inscrição (aba t1): visível para quem já tem cadastro,
+        bloqueado apenas para visitantes sem cadastro. */
+  var liberar = usuarioExistenteLogado();
   var area=document.getElementById('f1-area');
   var nav=document.getElementById('f1-nav');
   var stepper=document.getElementById('s1-stepper');
   var prog=document.querySelector('#t1 .step-prog');
   var fechado=document.getElementById('f1-encerrado');
-  if(area) area.style.display='none';
-  if(nav) nav.style.display='none';
-  if(stepper) stepper.style.display='none';
-  if(prog) prog.style.display='none';
-  if(fechado) fechado.style.display='flex';
+  if(area) area.style.display = liberar ? '' : 'none';
+  if(nav) nav.style.display = liberar ? '' : 'none';
+  if(stepper) stepper.style.display = liberar ? '' : 'none';
+  if(prog) prog.style.display = liberar ? '' : 'none';
+  if(fechado) fechado.style.display = liberar ? 'none' : 'flex';
 }
 document.addEventListener('DOMContentLoaded', aplicarStatusInscricoes);
 if(document.readyState!=='loading') aplicarStatusInscricoes();
@@ -4742,13 +4752,16 @@ submitAuth = async function(){
     alert('As inscrições estão encerradas. Não é possível criar um novo cadastro.');
     return;
   }
-  if(_origSubmitAuth) return _origSubmitAuth.apply(this, arguments);
+  var r = _origSubmitAuth ? await _origSubmitAuth.apply(this, arguments) : undefined;
+  /* Após login bem-sucedido, libera o formulário para o cadastro existente */
+  aplicarStatusInscricoes();
+  return r;
 };
 
-/* Bloqueio real do envio do formulário de inscrição, independente da interface */
+/* Bloqueio real do envio do formulário: só para quem NÃO possui cadastro existente */
 var _origSubmitForm1 = typeof submitForm1==='function' ? submitForm1 : null;
 submitForm1 = async function(){
-  if(!INSCRICOES_ABERTAS){
+  if(!INSCRICOES_ABERTAS && !usuarioExistenteLogado()){
     alert('As inscrições estão encerradas. Não é possível enviar novos cadastros.');
     aplicarStatusInscricoes();
     return;
@@ -4757,13 +4770,35 @@ submitForm1 = async function(){
 };
 var _origStepNav1 = typeof stepNav1==='function' ? stepNav1 : null;
 stepNav1 = async function(d){
-  if(!INSCRICOES_ABERTAS){
+  if(!INSCRICOES_ABERTAS && !usuarioExistenteLogado()){
     alert('As inscrições estão encerradas. Não é possível enviar novos cadastros.');
     aplicarStatusInscricoes();
     return;
   }
   if(_origStepNav1) return _origStepNav1.apply(this, arguments);
 };
+
+/* Reavalia o bloqueio quando o estado de login muda (login, sessão restaurada, logout) */
+var _origShowParticipantArea2 = typeof showParticipantArea==='function' ? showParticipantArea : null;
+showParticipantArea = function(){
+  var r = _origShowParticipantArea2 ? _origShowParticipantArea2.apply(this, arguments) : undefined;
+  aplicarStatusInscricoes();
+  return r;
+};
+var _origPreencherFormReg = typeof preencherFormularioComRegistro==='function' ? preencherFormularioComRegistro : null;
+preencherFormularioComRegistro = function(){
+  var r = _origPreencherFormReg ? _origPreencherFormReg.apply(this, arguments) : undefined;
+  aplicarStatusInscricoes();
+  return r;
+};
+var _origLogoutParticipant = typeof logoutParticipant==='function' ? logoutParticipant : null;
+if(_origLogoutParticipant){
+  logoutParticipant = function(){
+    var r = _origLogoutParticipant.apply(this, arguments);
+    aplicarStatusInscricoes();
+    return r;
+  };
+}
 
 /* ── Lock system (restored) ── */
 var SENHA_FAC='conectar2026';
