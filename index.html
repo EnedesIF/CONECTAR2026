@@ -1700,7 +1700,7 @@ async function supaGetUsuario(email){
       .limit(1)
       .maybeSingle();
     const {data,error} = await supaTimeout(query, 12000, 'Busca do usuário');
-    if(error){ console.warn('supaGetUsuario error:', error.message); return null; }
+    if(error){ console.warn('supaGetUsuario error:', error.message); throw new Error('CONEXAO: ' + error.message); }
     if(!data) return null;
     return Object.assign({}, data, {
       email: email,
@@ -1712,7 +1712,12 @@ async function supaGetUsuario(email){
       inscrito: !!(data.formpreenchido || data.formPreenchido || data.expectativas || data.contexto),
       senha: data.senha_hash || data.senha || ''
     });
-  }catch(e){ console.warn('supaGetUsuario exception:', e); return null; }
+  }catch(e){
+    console.warn('supaGetUsuario exception:', e);
+    var _m = (e && e.message) ? e.message : 'falha de rede';
+    if (_m.indexOf('CONEXAO') !== 0) _m = 'CONEXAO: ' + _m;
+    throw new Error(_m);
+  }
 }
 
 async function supaCriarUsuario(email, senha, nome, inst){
@@ -4423,7 +4428,12 @@ async function submitAuth() {
     }
   } catch(e) {
     console.warn('submitAuth error:', e);
-    showAuthError('Erro inesperado: ' + (e && e.message ? e.message : 'tente novamente.'));
+    var _msg = (e && e.message) ? e.message : '';
+    if (_msg.indexOf('CONEXAO') === 0 || /Failed to fetch|NetworkError|demorou demais|522/i.test(_msg)) {
+      showAuthError('Não foi possível conectar ao banco de dados (Supabase fora do ar ou pausado). Não é problema do seu e-mail ou senha — tente novamente em alguns minutos.');
+    } else {
+      showAuthError('Erro inesperado: ' + (_msg || 'tente novamente.'));
+    }
     resetBtn();
   }
 }
@@ -4561,7 +4571,9 @@ function gerarComprovanteParticipante() {
 window.addEventListener('load', async function() {
   var session = getSession();
   if (session && session.email) {
-    var user = await supaGetUsuario(session.email);
+    var user = null;
+    try { user = await supaGetUsuario(session.email); }
+    catch(e){ console.warn('Banco indisponível no load; usando sessão local:', e); user = session; }
     if (!user) { showSplash(); return; }
     _currentUser = user;
     saveSession(user);
